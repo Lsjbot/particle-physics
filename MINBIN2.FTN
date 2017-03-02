@@ -1,0 +1,761 @@
+      PROGRAM MIN
+C-----------------------------------------------------
+C  Minuit steering program, for the fitting
+C  to muon spectrum peaks.
+C-----------------------------------------------------
+C
+      WRITE(6,*)'Data cards :'
+C     (* Paste data cards on input line *)
+C
+      CALL MINNEW
+C
+      END
+C
+C=====================================================
+C
+      DOUBLE PRECISION FUNCTION GAU(AM,WID,H,XX)
+C----------------------------------
+C   Gaussian formula
+C----------------------------------
+      DOUBLE PRECISION AM,WID,H,XX,DEN
+      GAU = (H/(SQRT(6.2832)*WID))*EXP(-(AM-XX)*(AM-XX)/(2.*WID*WID))
+C
+      RETURN
+      END
+C
+C=====================================================
+C
+      DOUBLE PRECISION FUNCTION BG(CC,XX)
+C----------------------------------
+C   Background function
+C----------------------------------
+      DOUBLE PRECISION CC(*),XX
+C
+      BG = CC(1) + CC(2)*XX + CC(3)*XX*XX + CC(4)*XX*XX*XX
+CCC   BG = CC(1) * EXP(-CC(2)*XX)
+C
+      RETURN
+      END
+C
+C=====================================================
+C
+      DOUBLE PRECISION FUNCTION BW1(AM,WID,H,XX,AMRES)
+C----------------------------------
+C   Breit-Wigner formula
+C----------------------------------
+      DOUBLE PRECISION AM,WID,H,XX,DEN,WW,AMRES
+      DOUBLE PRECISION BW,GAU
+      DOUBLE PRECISION F1,F2,F3,SIG,ANOR,XX1,CEN
+C     
+      ANOR = 1.
+      CEN = 0.
+      F3 = 0.
+      DO 10 I=-20,20
+        XX1 = FLOAT(I)*AMRES*0.15
+        F1 = GAU(CEN,AMRES,ANOR,XX1)
+        F2 = BW(AM,WID,H,XX+XX1)
+        F3 = F3 + F1*F2
+ 10   CONTINUE
+      BW1 = F3
+C
+      RETURN
+      END
+C
+C=====================================================
+C
+      DOUBLE PRECISION FUNCTION BW(AM,WID,H,XX)
+C----------------------------------
+C   Breit-Wigner formula
+C----------------------------------
+      DOUBLE PRECISION AM,WID,H,XX,DEN,WW
+      WW = (153./64.)*WID
+      DEN = ((AM-XX)*(AM-XX)+0.25*WW*WW)
+      IF ( DEN .NE. 0 ) THEN
+        BW = (0.5/(3.1416*WW))*0.25*H*WW*WW/DEN
+      ELSE
+        BW = 0.0  
+      ENDIF
+C
+      RETURN
+      END
+C
+C=====================================================
+C
+      DOUBLE PRECISION FUNCTION BWP(AM,WID,H,XX,AMRES)
+C----------------------------------
+C   P-wave Breit-Wigner formula
+C----------------------------------
+      DOUBLE PRECISION AM,WID,H,XX,DEN,WW,AMRES
+      DOUBLE PRECISION BW,GAU,BWP0
+      DOUBLE PRECISION F1,F2,F3,SIG,ANOR,XX1,CEN
+C     
+      ANOR = 1.
+      CEN = 0.
+      F3 = 0.
+      DO 10 I=-20,20
+        XX1 = FLOAT(I)*AMRES*0.15
+        F1 = GAU(CEN,AMRES,ANOR,XX1)
+        F2 = BWP0(AM,WID,H,XX+XX1)
+        F3 = F3 + F1*F2
+ 10   CONTINUE
+      BWP = F3
+C
+      RETURN
+      END
+C
+C=====================================================
+C
+      DOUBLE PRECISION FUNCTION BWP0(AM,WID,H,XX)
+C----------------------------------
+C   Breit-Wigner formula
+C----------------------------------
+      DOUBLE PRECISION AM,WID,H,XX,DEN,WW,WWM
+      DOUBLE PRECISION Q,Q0
+      WW = (153./64.)*WID
+      IF ( AM .GT. 0.270 ) THEN
+        Q0 = SQRT(0.25*AM*AM-0.135*0.135)
+      ELSE 
+        WRITE(6,*)'AM = ',AM
+      ENDIF
+      IF ( XX .GT. 0.270 ) THEN
+        Q = SQRT(0.25*XX*XX-0.135*0.135)
+      ELSE 
+        WRITE(6,*)'XX = ',XX
+      ENDIF
+C**> Whyman :
+CCCCCCWWM = WW*((Q/Q0)**3)*AM/XX
+C**> Canter :
+      WWM = WW*((Q/Q0)**3)*2*Q0*Q0/(Q*Q+Q0*Q0)
+      DEN = (AM*AM-XX*XX)**2 + AM*AM*WWM*WWM
+      IF ( DEN .NE. 0 ) THEN
+        BWP0 = H*XX*AM*WWM/DEN
+      ELSE
+        BWP0 = 0.0  
+      ENDIF
+C
+      RETURN
+      END
+C
+C=====================================================
+C
+      DOUBLE PRECISION FUNCTION FEIDEL(AM,WID,XX)
+C
+      DOUBLE PRECISION AM,WID,XX
+      DOUBLE PRECISION GM,Q,Q0,AMPI,F1,F2
+C
+      DATA AMPI = 0.140
+      Q  = SQRT((0.5*XX)**2 - AMPI*AMPI)
+      Q0 = SQRT((0.5*AM)**2 - AMPI*AMPI)
+C
+      GM = WID*(Q/Q0)**3 * AM/XX
+C
+      F1 = XX*AM*GM
+      F2 = (XX*XX-AM*AM)**2 + AM*AM*GM*GM
+      FEIDEL = F1/F2
+C
+      RETURN
+      END
+C
+C=====================================================
+C
+      DOUBLE PRECISION FUNCTION EIDEL(AM1,AM2,W1,W2,R,A,XX,AMRES)
+C----------------------------------
+C   Interference formula from Eidelman
+C----------------------------------
+      DOUBLE PRECISION AM1,AM2,W1,W2,R,A,XX,AMRES
+CCCCCCCOMPLEX*16 C1,C2,C3,C4,CIM
+      COMPLEX    C1,C2,C3,C4,CIM
+      DOUBLE PRECISION F1,F2,F3,SIG,ANOR,GAU,EIDEL1,XX1,CEN
+      DATA ICALL/0/
+C                  
+C                  
+      IF ( ICALL .EQ. 0 ) THEN
+        WRITE(6,922)AM1,AM2,W1,W2,R,A,XX
+ 922    FORMAT(1X,'Masses = ',2F12.4,', widths = ',2F12.4
+     *           ,', R,A,XX = ',3F12.4)
+      ENDIF
+      ICALL = ICALL+1
+      ANOR = 1.
+      CEN = 0.
+      F3 = 0.
+      DO 10 I=-20,20
+        XX1 = FLOAT(I)*AMRES*0.15
+        F1 = GAU(CEN,AMRES,ANOR,XX1)
+        F2 = EIDEL1(AM1,AM2,W1,W2,R,A,XX+XX1)
+        F3 = F3 + F1*F2
+ 10   CONTINUE
+      EIDEL = F3
+      IF ( ICALL .LT. 20 ) THEN
+        WRITE(6,*)'EIDEL = ',F3
+      ENDIF
+C
+      RETURN
+      END
+
+C
+C=====================================================
+C
+      DOUBLE PRECISION FUNCTION EIDEL1(AM1,AM2,W1,W2,R,A,XX)
+C----------------------------------
+C   Eidelman's interference formula
+C----------------------------------
+      DOUBLE PRECISION AM1,AM2,W1,W2,R,A,XX
+CCCCCCCOMPLEX*16 C1,C2,C3,C4,CIM
+      COMPLEX    C1,C2,C3,C4,CIM
+      DOUBLE PRECISION F1,F2,F3
+      DOUBLE PRECISION FEIDEL
+C                  
+      CIM = (0.,1.)
+      F1 = SQRT(ABS(R*FEIDEL(AM1,W1,XX)))
+      F2 = SQRT(ABS((1.0-R)*FEIDEL(AM2,W2,XX)))
+      C1 = REAL(F1)
+      C4 = CIM*REAL(A)
+      C2 = REAL(F2)*EXP(C4)
+      EIDEL1 = ABS(C1+C2)**2
+C
+      RETURN
+      END
+C
+C=====================================================
+C
+      DOUBLE PRECISION FUNCTION CHIL(AM1,AM2,W1,W2,R,A,XX,AMRES)
+C----------------------------------
+C   Interference formula from Chlingarov et al
+C----------------------------------
+      DOUBLE PRECISION AM1,AM2,W1,W2,R,A,XX,AMRES
+CCCCCCCOMPLEX*16 C1,C2,C3,C4,CIM
+      COMPLEX    C1,C2,C3,C4,CIM
+      DOUBLE PRECISION F1,F2,F3,SIG,ANOR,GAU,CHIL1,XX1,CEN
+      DATA ICALL/0/
+C                  
+      IF ( ICALL .EQ. 0 ) THEN
+        WRITE(6,922)AM1,AM2,W1,W2,R,A,XX
+ 922    FORMAT(1X,'Masses = ',2F12.4,', widths = ',2F12.4
+     *           ,', R,A,XX = ',3F12.4)
+      ENDIF
+      ICALL = ICALL+1
+      ANOR = 1.
+      CEN = 0.
+      F3 = 0.
+      DO 10 I=-20,20
+        XX1 = FLOAT(I)*AMRES*0.15
+        F1 = GAU(CEN,AMRES,ANOR,XX1)
+        F2 = CHIL1(AM1,AM2,W1,W2,R,A,XX+XX1)
+        F3 = F3 + F1*F2
+ 10   CONTINUE
+      CHIL = F3
+      IF ( ICALL .LT. 20 ) THEN
+        WRITE(6,*)'CHIL = ',F3
+      ENDIF
+C
+      RETURN
+      END
+C
+C=====================================================
+C
+      DOUBLE PRECISION FUNCTION CHIL1(AM1,AM2,W1,W2,R,A,XX)
+C----------------------------------
+C   Breit-Wigner formula
+C----------------------------------
+      DOUBLE PRECISION AM1,AM2,W1,W2,R,A,XX
+CCCCCCCOMPLEX*16 C1,C2,C3,C4,CIM
+      COMPLEX    C1,C2,C3,C4,CIM
+      DOUBLE PRECISION F1,F2,F3
+C                  
+      CIM = (0.,1.)
+      F1 = SQRT(ABS(R*W1))
+      C1 = REAL(XX-AM1)+CIM*0.5*REAL(W1)
+      C4 = CIM*REAL(A)
+      C2 = REAL(SQRT(ABS((1.-R)*W2)))*EXP(C4)
+      C3 = REAL(XX-AM2)+CIM*0.5*REAL(W2)
+      F2 = ABS(REAL(F1)/C1+C2/C3)**2
+      CHIL1 = 0.5*F2/3.14159
+C
+      END
+C
+C=====================================================
+C
+      SUBROUTINE FCN(NPAR,G,F,X,IFLAG)
+C
+      PARAMETER ( MAXBIN = 300 )
+      PARAMETER ( MAXPAR =  17 )
+      DOUBLE PRECISION G(MAXPAR),F,X(MAXPAR)
+      DOUBLE PRECISION HH(MAXBIN),HE(MAXBIN),HX(MAXBIN)
+      DOUBLE PRECISION HLOW,HHIGH,BINWID,FH,CHI2,FY,XX,FF,FF1,FF2
+      DOUBLE PRECISION BW,GAU,HRHO,HOMEGA,CHIL,WRHO,WOME,AMRES,HPHI
+      DOUBLE PRECISION WOMEGA,BW1,BG,WMMRHO,BWP,EIDEL,RRR,ALPHA
+      DOUBLE PRECISION PHIINT,CHIINT,CSRHO,CSROR,CSPHI,CSERHO
+      DOUBLE PRECISION CSEROR,CSEPHI,BRRHO,BRERHO,BRPHI,BREPHI
+      DOUBLE PRECISION ARHO,APHI,AOME,EARHO,EAOME,EAPHI
+
+      INTEGER IUNLI(300),ILI(300),ISI(300)
+      REAL HCON(400)
+      COMMON/PAWC/HHH(30000)
+      SAVE HH,HE,HX,IFUNC,NBINS,IUNLI,ILI,ISI,ICALL
+      DATA ICALL/0/
+      DATA PHIINT/50.0/
+      DATA CSRHO/15.0/
+      DATA CSERHO/1.0/
+      DATA CSOME/15.0/
+      DATA CSROR/1.0/
+      DATA CSEROR/0.1/
+      DATA CSPHI/0.9/
+      DATA CSEPHI/0.2/
+      DATA BRRHO /0.00460/
+      DATA BRERHO/0.00028/
+      DATA BRPHI/0.025/
+      DATA BREPHI/0.003/
+C
+      IF (( IFLAG .EQ. 4 ).OR.(IFLAG.EQ. 3)) THEN
+C       (* Calculate function value only. *)
+C       (* Most common entry, thus first. *)
+       ICALL = ICALL + 1
+       IF ( IFUNC .NE. 2 )THEN
+        CHI2 = 0.0
+CCCCCCCCHRHO   = X(3)*X(6)/(X(6)+1.0)
+CCCCCCCCHOMEGA = X(3)     /(X(6)+1.0)
+        HRHO   = X(6)*X(3)
+        HOMEGA = (1.-X(6))*X(3)
+        WRHO = SQRT(X(2)*X(2)+X(5)*X(5)/(X(1)*X(1)))
+        ILOW = 0.400/BINWID
+        IHI  = 1.300/BINWID
+CCCCCC  ILOW = 0.600/BINWID
+CCCCCC  IHI  = 1.060/BINWID
+Clsj       KKBIN = -1
+        IF ( IFLAG .EQ. 3 ) THEN
+          WRITE(6,*)'KKBIN = ',KKBIN
+        ENDIF
+        IF ( IFUNC .EQ. 1 ) THEN
+          DO 20 I = ILOW,IHI 
+            XX = (I-0.5)*BINWID
+            FF = BW(X(1),WRHO,HRHO,XX) + GAU(X(4),X(5)/X(4),HOMEGA,XX)
+     *         + BW(X(7),X(5)/X(7),X(8),XX) 
+     *         + X( 9)+X(10)*XX+X(11)*XX*XX+X(12)*XX*XX*XX
+            CHI2 = CHI2 + (FF-HH(I))*(FF-HH(I))/HE(I)
+            IF ( ICALL .EQ. 1 ) THEN
+Cwr              WRITE(6,332)XX,HH(I),FF
+ 332          FORMAT(1X,'x,data(x),fit-f(x) : ',3F15.5)
+            ENDIF
+ 20       CONTINUE
+        ELSEIF ( IFUNC .EQ. 3 ) THEN
+          DO 21 I = ILOW,IHI 
+            XX = (I-0.5)*BINWID
+            FF = GAU(X(1),WRHO,HRHO,XX) + GAU(X(4),X(5)/X(4),HOMEGA,XX)
+     *         + GAU(X(7),X(5)/X(7),X(8),XX) 
+     *         + X( 9)+X(10)*XX+X(11)*XX*XX+X(12)*XX*XX*XX
+            CHI2 = CHI2 + (FF-HH(I))*(FF-HH(I))/HE(I)
+Cwr            IF ( ICALL .EQ. 1 ) THEN
+Cwr              WRITE(6,332)XX,HH(I),FF
+Cwr            ENDIF
+ 21       CONTINUE
+        ELSEIF ( IFUNC .EQ. 4 ) THEN
+          WOME = 0.0085
+          AMRES= X(5)/X(4)           
+          WRHO = X(2) *153./64.
+          DO 22 I = ILOW,IHI 
+            XX = (I-0.5)*BINWID
+            FF = X(3)*CHIL(X(1),X(4),WRHO,WOME,X(6),X(13),XX,AMRES)
+     *         + BW(X(7),X(5)/X(7),X(8),XX) 
+     *         + X( 9)+X(10)*XX+X(11)*XX*XX+X(12)*XX*XX*XX
+            CHI2 = CHI2 + (FF-HH(I))*(FF-HH(I))/HE(I)
+Cwr            IF ( ICALL .EQ. 1 ) THEN
+Cwr              WRITE(6,332)XX,HH(I),FF
+Cwr            ENDIF
+ 22       CONTINUE
+        ELSEIF ( IFUNC .EQ. 11 ) THEN
+          WOMEGA = 0.0085*64./153.
+          WRHO   = X(2)
+          AMRES= X(5)/X(4)           
+          DO 210 I = ILOW,IHI,4 
+            XX = (I+KKBIN)*BINWID
+C           (* Try p-wave *)
+CCCCCCCCCCCCWMMRHO = WRHO*((XX/X(1))**3)
+            WMMRHO = WRHO
+Cwr            IF ( ICALL .EQ. 1 ) THEN
+Cwr              WRITE(6,*)'WRHO, WMMRHO = ',WRHO,WMMRHO
+Cwr            ENDIF
+            FF = BW1(X(1),WMMRHO,HRHO,XX,AMRES) 
+     *         + BW1(X(4),WOMEGA,HOMEGA,XX,AMRES)
+     *         + GAU(X(7),X(5)/X(7),X(8),XX) 
+     *         + BG(X(9),XX)
+            FF = 4.*FF
+            FY = HH(I+KKBIN-1)+HH(I+KKBIN)+HH(I+KKBIN+1)+HH(I+KKBIN+2)
+            FH = HE(I+KKBIN-1)+HE(I+KKBIN)+HE(I+KKBIN+1)+HE(I+KKBIN+2)
+            CHI2 = CHI2 + (FF-FY)*(FF-FY)/FH
+            IF ( ICALL .EQ. 1 ) THEN
+Cwr              WRITE(6,332)XX,HH(I)+HH(I+1)+HH(I+2)+HH(I+3),FF
+              HCON(I) = FF
+            ENDIF
+            IF ( IFLAG .EQ. 3 ) THEN
+              HCON(I) = FF
+            ENDIF
+ 210      CONTINUE
+        ELSEIF ( IFUNC .EQ. 14 ) THEN
+          WRHO = X(2) *153./64.
+          DO 224 I = ILOW,IHI,4 
+            XX = X(14) + (I+KKBIN)*BINWID
+            WOME = 0.0084
+            AMRES= X(5)/X(4)           
+CCCCC       *WRHO = WRHO *153./64.
+            FF = X(3)*CHIL(X(1),X(4),WRHO,WOME,X(6),X(13),XX,AMRES)
+     *         + GAU(X(7),X(5)/X(7),X(8),XX) 
+     *         + BG(X(9),XX-X(14)) 
+CCCCCCC     *         + GAU(X(15),X(16),X(17),XX)
+            FF = 4.*FF
+            FY = HH(I+KKBIN-1)+HH(I+KKBIN)+HH(I+KKBIN+1)+HH(I+KKBIN+2)
+            FH = HE(I+KKBIN-1)+HE(I+KKBIN)+HE(I+KKBIN+1)+HE(I+KKBIN+2)
+            CHI2 = CHI2 + (FF-FY)*(FF-FY)/FH
+            IF ( ICALL .EQ. 1 ) THEN
+Cwr              WRITE(6,332)XX,HH(I)+HH(I+1)+HH(I+2)+HH(I+3),FF
+              HCON(I) = FF
+            ENDIF
+            IF ( IFLAG .EQ. 3 ) THEN
+              HCON(I) = FF
+            ENDIF
+ 224      CONTINUE
+          IF ( ICALL .EQ. -999 ) THEN
+            WRITE(6,*)'Chil-integrals : ' 
+            FF1 = 0.0
+            DO 387 I = ILOW,IHI
+              XX = I*BINWID
+              WOME = 0.0084
+              HPHI = 0.25
+              FF1 = FF1 + GAU(X(7),X(5)/X(7),HPHI,XX) 
+ 387        CONTINUE
+            WRITE(6,*)'------------------------------------------'
+            WRITE(6,*)'Phi integral = ',FF1
+            WRITE(6,*)'------------------------------------------'
+            FY = 0.0
+            FH = 0.0
+            DO 375 IR = 0,10
+              RRR = 0.1*IR
+              FF2 = 0.0
+              DO 376 IA = 0,20
+                ALPHA = IA*6.2832/21.0
+                FF1 = 0.0
+                DO 377 I = ILOW,IHI
+                  XX = I*BINWID
+                  WOME = 0.0084
+                  AMRES= X(5)/X(4)           
+CCC                  AMRES = 0.001
+                  FF1 = FF1 + 
+     *                0.25*CHIL(X(1),X(4),WRHO,WOME,RRR,ALPHA,XX,AMRES)
+ 377            CONTINUE
+CCC                WRITE(6,397)RRR,ALPHA,FF1
+CCC 397            FORMAT(1X,'RRR,ALPHA,INTEGRAL = ',3F15.5)
+                FF2 = FF2 + FF1
+ 376          CONTINUE
+              WRITE(6,*)'------------------------------------------'
+              WRITE(6,*)' Average over alpha = ',FF2/21.0,', R= ',RRR
+              WRITE(6,*)' Delta = ',(FF2-FH)/21.0
+              WRITE(6,*)'------------------------------------------'
+              FH = FF2
+              FY = FY + FF2
+ 375        CONTINUE
+            WRITE(6,*)'------------------------------------------'
+            WRITE(6,*)' Average over ALL = ',FY/231.0
+            WRITE(6,*)'------------------------------------------'
+          ENDIF
+        ELSEIF ( IFUNC .EQ. 15 ) THEN
+          WOMEGA = 0.0085*64./153.
+          WRHO   = X(2)
+          AMRES= X(5)/X(4)           
+          DO 251 I = ILOW,IHI,4 
+            XX = (I+KKBIN)*BINWID
+C           (* Try p-wave *)
+CCCCCCCCCCCCWMMRHO = WRHO*((XX/X(1))**3)
+            WMMRHO = WRHO
+            FF = BWP(X(1),WMMRHO,HRHO,XX,AMRES) 
+     *         + BWP(X(4),WOMEGA,HOMEGA,XX,AMRES)
+     *         + GAU(X(7),X(5)/X(7),X(8),XX) 
+     *         + BG(X(9),XX)
+            FF = 4.*FF
+            FY = HH(I+KKBIN-1)+HH(I+KKBIN)+HH(I+KKBIN+1)+HH(I+KKBIN+2)
+            FH = HE(I+KKBIN-1)+HE(I+KKBIN)+HE(I+KKBIN+1)+HE(I+KKBIN+2)
+            CHI2 = CHI2 + (FF-FY)*(FF-FY)/FH
+            IF ( ICALL .EQ. 1 ) THEN
+Cwr              WRITE(6,332)XX,HH(I)+HH(I+1)+HH(I+2)+HH(I+3),FF
+              HCON(I) = FF
+            ENDIF
+            IF ( IFLAG .EQ. 3 ) THEN
+              HCON(I) = FF
+            ENDIF
+ 251      CONTINUE
+        ELSEIF ( IFUNC .EQ. 16 ) THEN
+          WRHO = X(2) *153./64.
+          DO 226 I = ILOW,IHI,4 
+            XX = X(14) + (I+KKBIN)*BINWID
+            WOME = 0.0084
+            WOMEGA = 0.0085*64./153.
+            AMRES= X(5)/X(4)           
+CCCCC       *WRHO = WRHO *153./64.
+            FF1 = X(3)*CHIL(X(1),X(4),WRHO,WOME,X(6),X(13),XX,AMRES)
+     *         + GAU(X(7),X(5)/X(7),X(8),XX) 
+     *         + BG(X(9),XX-X(14)) 
+CCCCCCC     *         + GAU(X(15),X(16),X(17),XX)
+            FF2 = BW1(X(1),WRHO,HRHO,XX,AMRES) 
+     *         + BW1(X(4),WOMEGA,HOMEGA,XX,AMRES)
+     *         + GAU(X(7),X(5)/X(7),X(8),XX) 
+     *         + BG(X(9),XX)
+            FF = X(15)*FF1 + (1.0-X(15))*FF2
+            FF = 4.*FF
+            FY = HH(I+KKBIN-1)+HH(I+KKBIN)+HH(I+KKBIN+1)+HH(I+KKBIN+2)
+            FH = HE(I+KKBIN-1)+HE(I+KKBIN)+HE(I+KKBIN+1)+HE(I+KKBIN+2)
+            CHI2 = CHI2 + (FF-FY)*(FF-FY)/FH
+            IF ( ICALL .EQ. 1 ) THEN
+Cwr              WRITE(6,332)XX,HH(I)+HH(I+1)+HH(I+2)+HH(I+3),FF
+              HCON(I) = FF
+            ENDIF
+            IF ( IFLAG .EQ. 3 ) THEN
+              HCON(I) = FF
+            ENDIF
+ 226      CONTINUE
+        ELSEIF ( IFUNC .EQ. 17 ) THEN
+          WRHO = X(2) *153./64.
+          RRR = BRRHO*CSRHO/(BRRHO*CSRHO+X(6)*CSROR*CSRHO)
+          CHIINT = 11454.75 - 1202.2*RRR
+          IF ( ICALL .EQ. 1 ) THEN
+            EARHO = SQRT((CSERHO/CSRHO)**2 + (BRERHO/BRRHO)**2)
+            EAOME = SQRT((CSERHO/CSRHO)**2 + (CSEROR/CSROR)**2)
+            EAPHI = SQRT((CSEPHI/CSPHI)**2 + (BREPHI/BRPHI)**2)
+          ENDIF
+          DO 227 I = ILOW,IHI,4 
+CCC            XX = X(14) + (I+KKBIN)*BINWID
+            XX = (I+KKBIN)*BINWID*(1.0+X(14))
+            WOME = 0.0084
+            AMRES= X(5)/X(4)           
+            FF = X(3)*CHIL(X(1),X(4),WRHO,WOME,RRR,X(13),XX,AMRES)
+     *         + GAU(X(7),X(5)/X(7),X(8),XX) 
+     *         + BG(X(9),XX-X(14)) 
+            FF = 4.*FF
+            FY = HH(I+KKBIN-1)+HH(I+KKBIN)+HH(I+KKBIN+1)+HH(I+KKBIN+2)
+            FH = HE(I+KKBIN-1)+HE(I+KKBIN)+HE(I+KKBIN+1)+HE(I+KKBIN+2)
+            CHI2 = CHI2 + (FF-FY)*(FF-FY)/FH
+            IF ( ICALL .EQ. 1 ) THEN
+Cwr              WRITE(6,332)XX,HH(I)+HH(I+1)+HH(I+2)+HH(I+3),FF
+              HCON(I) = FF
+            ENDIF
+            IF ( IFLAG .EQ. 3 ) THEN
+              HCON(I) = FF
+            ENDIF
+ 227      CONTINUE
+          ARHO = X(15)*X(3)*RRR*CHIINT
+          IF ( X(6) .LT. 1E-3 ) THEN
+            WRITE(6,*)'BR,RRR = ',X(6),RRR
+            F = CHI2
+            RETURN
+          ENDIF
+          ABOME = X(15)*X(3)*(1.0-RRR)*CHIINT/X(6)
+          APHI = X(15)*X(8)*PHIINT
+          CHI2 = CHI2 + ((ARHO-CSRHO*BRRHO)/(EARHO*CSRHO*BRRHO))**2
+          CHI2 = CHI2 + ((ABOME-CSRHO*CSROR)/
+     *                      (EAOME*CSRHO*CSROR))**2
+          CHI2 = CHI2 + ((APHI-CSPHI*BRPHI)/(EAPHI*CSPHI*BRPHI))**2
+CCCC          WRITE(6,*)'RRR, CHI2 = ',RRR,CHI2
+CCCC          IF ( IFLAG .EQ. 3 ) THEN
+CCCC            WRITE(6,*)'NO RHO !!!'
+CCCC          ENDIF
+        ELSEIF ( IFUNC .EQ. 18 ) THEN
+          WRHO = X(2) 
+          RRR = BRRHO*CSRHO/(BRRHO*CSRHO+X(6)*CSROR*CSRHO)
+CCC          CHIINT = 11454.75 - 1202.2*RRR
+          IF ( ICALL .EQ. 1 ) THEN
+            EARHO = SQRT((CSERHO/CSRHO)**2 + (BRERHO/BRRHO)**2)
+            EAOME = SQRT((CSERHO/CSRHO)**2 + (CSEROR/CSROR)**2)
+            EAPHI = SQRT((CSEPHI/CSPHI)**2 + (BREPHI/BRPHI)**2)
+          ENDIF
+          HRHO = X(3)*RRR
+          ARHO = X(15)*X(3)*RRR
+          IF ( X(6) .LT. 1E-3 ) THEN
+            WRITE(6,*)'BR,RRR = ',X(6),RRR
+            F = 99999.9 - 10000.0*X(6)
+            RETURN
+          ENDIF
+          HOMEGA = X(3)*(1.0-RRR)
+          ABOME = X(15)*X(3)*(1.0-RRR)/X(6)
+          APHI = X(15)*X(8)
+          DO 227 I = ILOW,IHI,4 
+CCC            XX = X(14) + (I+KKBIN)*BINWID
+            XX = (I+KKBIN)*BINWID*(1.0+X(14))
+            WOMEGA = 0.0084*64./153.
+            AMRES= X(5)/X(4)           
+            FF = BW1(X(1),WRHO,HRHO,XX,AMRES) 
+     *         + BW1(X(4),WOMEGA,HOMEGA,XX,AMRES)
+     *         + BW1(X(7),0.002,X(8),XX,AMRES) 
+     *         + BG(X(9),XX)
+            FF = 4.*FF
+            FY = HH(I+KKBIN-1)+HH(I+KKBIN)+HH(I+KKBIN+1)+HH(I+KKBIN+2)
+            FH = HE(I+KKBIN-1)+HE(I+KKBIN)+HE(I+KKBIN+1)+HE(I+KKBIN+2)
+            CHI2 = CHI2 + (FF-FY)*(FF-FY)/FH
+            IF ( ICALL .EQ. 1 ) THEN
+Cwr              WRITE(6,332)XX,HH(I)+HH(I+1)+HH(I+2)+HH(I+3),FF
+              HCON(I) = FF
+            ENDIF
+            IF ( IFLAG .EQ. 3 ) THEN
+              HCON(I) = FF
+            ENDIF
+ 227      CONTINUE
+          CHI2 = CHI2 + ((ARHO-CSRHO*BRRHO)/(EARHO*CSRHO*BRRHO))**2
+          CHI2 = CHI2 + ((ABOME-CSRHO*CSROR)/
+     *                      (EAOME*CSRHO*CSROR))**2
+          CHI2 = CHI2 + ((APHI-CSPHI*BRPHI)/(EAPHI*CSPHI*BRPHI))**2
+CCCC          WRITE(6,*)'RRR, CHI2 = ',RRR,CHI2
+CCCC          IF ( IFLAG .EQ. 3 ) THEN
+CCCC            WRITE(6,*)'NO RHO !!!'
+CCCC          ENDIF
+        ENDIF
+        IF (( IFLAG .EQ. 3 ).OR.(ICALL.EQ.1)) THEN
+CCCCCCCCIF ( .FALSE. ) THEN
+          CALL HPAK(10,HCON)
+CCCC          CALL HPRINT(10) 
+          IF ( IFUNC .EQ. 17 ) THEN
+            WRHO = X(2) *153./64.
+            RRR = BRRHO*CSRHO/(BRRHO*CSRHO+X(6)*CSROR*CSRHO)
+            CHIINT = 11454.75 - 1202.2*RRR
+            DO 727 I = 1,500
+              XX = 0.300 + 0.002*I
+              WOME = 0.0084
+              AMRES= X(5)/X(4)           
+              FF = X(3)*CHIL(X(1),X(4),WRHO,WOME,RRR,X(13),XX,AMRES)
+     *         + GAU(X(7),X(5)/X(7),X(8),XX) 
+     *         + BG(X(9),XX-X(14)) 
+              FF = 4.*FF
+Cwr              WRITE(6,772)I,FF
+Cwr              WRITE(6,782)I,XX
+ 727        CONTINUE
+          ELSEIF ( IFUNC .EQ. 14 ) THEN
+            WOME = 0.0084
+            WRHO = X(2) *153./64.
+            AMRES= X(5)/X(4)           
+            DO 73 I = 1,500
+              XX = 0.300 + 0.002*I
+              FF = X(3)*CHIL(X(1),X(4),WRHO,WOME,X(6),X(13),XX,AMRES)
+     *           + GAU(X(7),X(5)/X(7),X(8),XX) 
+     *           + BG(X(9),XX)
+              FF = 4.0*FF
+Cwr              WRITE(6,772)I,FF
+ 772          FORMAT(1X,'V/IN Y(',I3,') ',F15.5)
+Cwr              WRITE(6,782)I,XX
+ 782          FORMAT(1X,'V/IN X(',I3,') ',F15.5)
+ 73         CONTINUE
+          ELSEIF ( IFUNC .EQ. 11 ) THEN
+            WOMEGA = 0.0085*64./153.
+            WRHO   = X(2)
+            DO 74 I = 1,500
+              XX = 0.600 + 0.001*I
+              FF = BW1(X(1),WRHO,HRHO,XX,X(5)) 
+     *           + BW1(X(4),WOMEGA,HOMEGA,XX,X(5))
+     *           + GAU(X(7),X(5)/X(7),X(8),XX) 
+     *           + BG(X(9),XX)
+Cwr              WRITE(6,772)I,FF
+Cwr              WRITE(6,782)I,XX
+ 74         CONTINUE
+          ENDIF
+        ENDIF
+       ELSE 
+C       (* IFUNC .EQ 2 *)
+        CHI2 = 0.0
+        ILOW = 0.300/BINWID
+        IHI  = 0.600/BINWID
+CCCCCCC DO 25 I = ILOW,IHI,4
+C         XX = (I+KKBIN)*BINWID
+C         FF = BG(X(1),XX)
+C         FF = 4.*FF
+C         FY = HH(I+KKBIN-1)+HH(I+KKBIN)+HH(I+KKBIN+1)+HH(I+KKBIN+2)
+C         FH = HE(I+KKBIN-1)+HE(I+KKBIN)+HE(I+KKBIN+1)+HE(I+KKBIN+2)
+C         CHI2 = CHI2 + (FF-FY)*(FF-FY)/FH
+C         IF (( ICALL .EQ. 1 ).OR.(IFLAG.EQ. 3)) THEN
+C           WRITE(6,337)XX,FY,FF,(FF-FY)*(FF-FY)/FH
+C         ENDIF
+C337      FORMAT(1X,'x,data(x),fit-f(x) : ',4F15.5)
+C25     CONTINUE
+C       ILOW = 1.100/BINWID
+C       IHI  = 1.490/BINWID
+C       DO 26 I = ILOW,IHI,4
+C         XX = (I+KKBIN)*BINWID
+C         FF = BG(X(1),XX)
+C         FF = 4.*FF
+C         FY = HH(I+KKBIN-1)+HH(I+KKBIN)+HH(I+KKBIN+1)+HH(I+KKBIN+2)
+C         FH = HE(I+KKBIN-1)+HE(I+KKBIN)+HE(I+KKBIN+1)+HE(I+KKBIN+2)
+C         CHI2 = CHI2 + (FF-FY)*(FF-FY)/FH
+C         IF (( ICALL .EQ. 1 ).OR.(IFLAG.EQ. 3)) THEN
+C           WRITE(6,337)XX,FY,FF,(FF-FY)*(FF-FY)/FH
+C         ENDIF
+C26CCCC CONTINUE
+        DO 25 I = ILOW,IHI 
+          XX = (I-0.5)*BINWID
+          FF = BG(X(1),XX) + GAU(X(5),X(6),X(7),XX)
+          CHI2 = CHI2 + (FF-HH(I))*(FF-HH(I))/HE(I)
+Cwr          IF ( ICALL .EQ. 1 ) THEN
+Cwr            WRITE(6,332)XX,HH(I),FF
+Cwr          ENDIF
+ 25     CONTINUE
+        ILOW = 1.100/BINWID
+        IHI  = 1.390/BINWID
+        DO 26 I = ILOW,IHI 
+          XX = (I-0.5)*BINWID
+          FF = BG(X(1),XX)
+          CHI2 = CHI2 + (FF-HH(I))*(FF-HH(I))/HE(I)
+Cwr          IF ( ICALL .EQ. 1 ) THEN
+Cwr            WRITE(6,332)XX,HH(I),FF
+Cwr          ENDIF
+ 26     CONTINUE
+       ENDIF
+Cwr       IF (( ICALL .LE. 10 ).OR.(IFLAG.EQ. 3)) THEN
+Cwr         WRITE(6,*)'FCN : ',CHI2,X
+Cwr       ENDIF
+Cwr       IF ( MOD(ICALL,500) .EQ. 0 ) THEN
+Cwr         WRITE(6,*)'FCN : ',CHI2,X
+Cwr       ENDIF
+       F = CHI2
+      ELSEIF ( IFLAG .EQ. 1 ) THEN
+C       (* Initialize *)
+        CALL HLIMIT(30000)
+        CALL HBOOK1(10,'Fitted function$',300,0.,1.5,0)
+        CALL HBOOK1(20,'Fitted function$',400,0.6,1.0,0)
+CCCCCC  CALL HIDOPT(0,'ROTA')
+        DO 108 I=1,300
+          HCON(I) = 0.0
+ 108    CONTINUE
+        OPEN(10,FILE='omega89.listing',STATUS='OLD')
+CCCCCCC OPEN(10,FILE='omega.listing',STATUS='OLD')
+CCCCCCC OPEN(10,FILE='omega_sum.listing',STATUS='OLD')
+        READ(10,*)
+        READ(10,*)
+        BINWID = 0.005
+        NBINS = 300
+        WRITE(6,*)'    +-        ++/--         SIGNAL'
+        DO 10 I=1,NBINS
+          READ(10,200)IUNLI(I),ILI(I),ISI(I)
+ 200      FORMAT(3I12)
+C           89 only:
+CCCCCCCCC HH(I) = 0.25*IUNLI(I)
+          HH(I) = IUNLI(I)
+C         (* Errors will be used as squares only : *)
+          IF ( IUNLI(I) .GT. 0 ) THEN
+            HE(I) = HH(I)
+          ELSE
+            HE(I) = 1.0
+          ENDIF
+C-->    '89 acceptance:
+          HH(I) = 150.0*HH(I)/FLOAT(I)
+          HE(I) = 150.0*HE(I)/FLOAT(I)
+CCCCCCC   WRITE(6,811)IUNLI(I),ILI(I),ISI(I)
+C811CCC   FORMAT(1X,3I12)
+  10    CONTINUE
+C       (* Read one data card, saying which of the three possible *)
+C       (* functions to fit. *)
+        READ(5,300)IFUNC
+ 300    FORMAT(15X,I2)
+        WRITE(6,*)'Fit function # ',IFUNC 
+C       (* ... and another one for the binning: *)
+        READ(5,300)KKBIN
+        WRITE(6,*)'KKBIN = ',KKBIN
+        CLOSE(5)
+      ELSE
+C       (* Not supposed to be used *)
+        WRITE(6,*)'Funny ! FCN called with IFLAG = ',IFLAG
+      ENDIF
+C
+      RETURN
+      END
