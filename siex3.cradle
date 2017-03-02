@@ -1,0 +1,1953 @@
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *               
+* *                                                           * *               
+* *   Example program for use of the                          * *               
+* *   combined Monte Carlo and reconstruction program for     * *               
+* *   the Helios Si-strip detectors.                          * *               
+* *                                                           * *               
+* *       Sverker Johansson  &  Pierre Aubry    8-Mar-88      * *               
+* *                                                           * *               
+* *                                                           * *               
+* *    Questions or comments to :                             * *               
+* *                                                           * *               
+* *      Sverker Johansson, LSJ AT CERNVM                     * *               
+* *                                                           * *               
+* *    NOTE: This program uses HBOOK version 4  !             * *               
+* *                                                           * *               
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *               
++USE,IBM.                                                                       
++USE,CERN.                                                                      
+CUSE,MCARLOSI.  Flag to control if MonteCarlo or reconstruction run,            
++USE,SIAL88.                                                                    
++USE,SICALIB.                                                                   
+CUSE,SIBEAM.                                                                    
+CUSE,SIRDEAD.                                                                   
+CUSE,SINBDEAD.                                                                  
++USE,*NA34CRA.                                                                  
++EXE,*NA34CRA.                                                                  
++SELF.                          USER CHANGES HERE +KEEPS OF NA34 PAM            
++SELF.                                                                          
++SELF.                                                                          
++SELF.                          USER ADDS HERE HIS OWN KEEPS SEQUENCES          
++KEEP,MYCOUN.                                                                   
+        COMMON /MYCOUN/ NEVENT,MAXEVT,IIRUN,JLEVEN                              
+        COMMON /EVTCAR/ ITIME,IDATE,IBURST,IEVTBU                               
+        COMMON /EVTVFB/ VFBSEL(51)                                              
+        LOGICAL VFBSEL                                                          
++KEEP,SIALIGN.                                                                  
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *               
+* *                                                           * *               
+* *     Alignment parameters for Si-strips                    * *               
+* *     SIDX   (I) : Offset in X from nominal position.       * *               
+* *     SIDZ   (I) :   "       Z   "     "       "            * *               
+* *     AAX    (I) : Rotation around Y-axis. (dDX/dX)         * *               
+* *     BBY    (I) :   "         "   Y-axis. (dDX/dY)         * *               
+* *     AALIN,BBLIN : Parameters of a linear fit to the         *               
+* *                   residuals in plane 2, for the 4 quadrants.*               
+* *                                                           * *               
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *               
+*                                                                               
+      COMMON/SIALIN/SIDX(3),SIDZ(3),AAX(3),BBY(3)                               
+     *             ,AALIN(4),BBLIN(4),BBFIX(40,3)                               
+     *             ,AAALIN(4,3),BBBLIN(4,3)                                     
+     *             ,STRDX(400,3)                                                
+*                                                                               
++SELF.=========================================================                 
++PAM,12, R=CDECRA, T=HOLD.      READ NA34 CRADLE                                
++PAM,13, R=GCDES.               READ GIANT KEEPS                                
++PAM,14.                                                                        
+CPAM,17,T=ATTACH. SISTRIP PAM *                                                 
++PAM,12, T=RESUME.              READ NA34 CRADLE AND REWIND                     
++SELF.                          CHANGES TO NA34 ROUTINES                        
++USE,P=SALBMAIN,D=LBMAIN.  Fixes for HBOOK4 !                                   
++EXE,P=SALBMAIN,D=LBMAIN.                                                       
++DEL,P=SALBMAIN,D=LBMAIN,C=103. (HLIMIT)                                        
++REP,P=SALBMAIN,D=LBMAIN,C=106. (ZHINIT)                                        
+       CALL ZINIT(IZSFS1,ILBLNK,LENZBK)                                         
+CUSE,P=SIRECO,D=SITRAK,T=EXE.                                                   
++SELF.                                                                          
++PAM,11.                                                                        
++SELF.                                                                          
++PATCH,MYDECKS.                                                                 
++DECK, MYINI.                                                                   
+       SUBROUTINE MYINI (IRUN)                                                  
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *               
+* *                                                           * *               
+* *    GENERAL USER INITIALISATION                            * *               
+* *                                                           * *               
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *               
+* *                                                                             
+* * >  PICK UP SOME SANDRA COMMONS                                              
++CDE,SALLIO,SAPCTL,SAGNAM.                                                      
++CDE,DIFLAG.                                                                    
+* * >  PICKUP MY COMMONS.                                                       
++CDE,MYCOUN.                                                                    
+*                                                                               
+* * > PICKUP SI... COMMONS                                                      
++CDE,SIFLAG.                                                                    
++CDE,SICOM.                                                                     
++CDE,SICUTS.                                                                    
++CDE,SIADC.                                                                     
++CDE,SICAL.                                                                     
++CDE,SIALIGN                                                                    
+       COMMON/PAWC/HH(250000)                                                   
+*                                                                               
+* * >  GENERAL I/O INITIALISATIONS  * *                                         
+*                                                                               
++SELF,IF=MCARLOSI.                                                              
+      NINPTS = 0                                                                
++SELF,IF=-MCARLOSI.                                                             
+      NINPTS = 1                                                                
++SELF.                                                                          
+       NOTPTS     =  0                                                          
+       EXPRTS(1) = .TRUE.                                                       
+       ZBKFMS(1)  =  .FALSE.                                                    
+CCCC   CALL HBSPCE(40000,IERR)                                                  
+       CALL HLIMIT(250000)                                                      
+CCC    CALL SETVFB(27)                                                          
+*                                                                               
+*                                                                               
+* * >  TIME LIMIT INITIALISATION                * *                             
+*                                                                               
+       TQUIT      = 15.0                                                        
+*                                                                               
+* * >  INITIATE EVENT COUNTERS                  * *                             
+*                                                                               
+       NEVENT     =  0                                                          
+       IIRUN      = 0                                                           
+*      MAXEVT     =  60000                                                      
+*                                                                               
+* * >  SET SOME SI... FLAGS                                                     
+*                                                                               
+       USEPL1     = .TRUE.                                                      
+       USEPL2     = .TRUE.                                                      
+       USEPL3     = .TRUE.                                                      
+       RAWDP1     = .FALSE.                                                     
+       RAWDP2     = .FALSE.                                                     
+       RAWDP3     = .FALSE.                                                     
+       XTPED1     = .FALSE.                                                     
+       XTPED2     = .FALSE.                                                     
+       XTPED3     = .FALSE.                                                     
+       PEDDMP     = .FALSE.                                                     
+       CALDMP     = .FALSE.                                                     
+       ADCDP1     = .FALSE.                                                     
+       ADCDP2     = .FALSE.                                                     
+       ADCDP3     = .FALSE.                                                     
+       STRDP1     = .FALSE.                                                     
+       STRDP2     = .FALSE.                                                     
+       STRDP3     = .FALSE.                                                     
+*                                                                               
+* * > SET FLAGS FOR SVERKER'S PART (+CDE,SICOM.)                                
+*                                                                               
++SELF,IF=MCARLOSI.                                                              
+      MCSI      = .TRUE.                                                        
++SELF,IF=-MCARLOSI.                                                             
+      MCSI      = .FALSE.                                                       
++SELF.                                                                          
+      HITREC    = .TRUE.                                                        
+      TRKREC    = .TRUE.                                                        
+      VTXREC    = .TRUE.                                                        
+      MCDEB     = .FALSE.                                                       
+      ANHIST    = .TRUE.                                                        
+      DEBHIS    = .TRUE.                                                        
+      STRHIS    = .FALSE.                                                       
+      EVHIST    = .FALSE.                                                       
+      LUCTRK    = .FALSE.                                                       
+      SDEBUG    = .FALSE.                                                       
+      NLIPOL    = .FALSE.                                                       
+      PRNTSI    = .FALSE.                                                       
+      VX2REC    = .TRUE.                                                        
+      RETRAK    = .FALSE.                                                       
+      REUSE     = .FALSE.                                                       
+*                                                                               
+* * >  Choose cut                                                               
+*                                                                               
+      CHITRC = 10.                                                              
+*                                                                               
+* * >  Initialize Si-strip package                * *                           
+*                                                                               
+       CALL SIINIT (890707)                                                     
+       CALL SIPRNT (6)                                                          
+*                                                                               
+* * >  Initialize Si-pad package :                                              
+*                                                                               
+****** CALL SPINIT(1)                                                           
+*                                                                               
+       CALL HBOOK1(120,'Vertex Z$',40,-20.,20.,0)                               
+       CALL HBOOK1(121,'Vertex X$',40,-0.5,0.5,0)                               
+       CALL HBOOK2(122,'Vertex X vs Z$',40,-4.,12.,20,-0.2,0.2,0)               
+       CALL HBOOK1(123,'Vertex Z$',40,0.,16.,0)                                 
+       CALL HBOOK1(124,'Vertex Z, out in X$',40,-10.,10.,0)                     
+       CALL HBOOK1(125,'Vertex X, out in Z$',40,-0.5,0.5,0)                     
+       CALL HBOOK1(126,'Chi2/NDF, vertex in target$',40,0.,10.,0)               
+       CALL HBOOK1(127,'Chi2/NDF, vertex not in target$',40,0.,10.,0)           
+       CALL HBOOK2(128,'Vertex X vs Z,no-tg$',40,-4.,12.,20,-0.2,0.2,0)         
+       CALL HBPROF(129,'Vertex X vs Z$',20,-1.,3.,-0.2,0.2,' ')                 
+       CALL HBOOK1(130,'STRDX$',40,-0.005,0.005,0)                              
+       CALL HBOOK1(131,'Strip residues$',40,0.005,0.005,0)                      
+       CALL HBOOK1(132,'Residu, small STRDX$',40,-0.01,0.01,0)                  
+       CALL HBPROF(133,'Vtx Chi2 (mult)$',20,0.5,20.5,0.,20.00,' ')             
+      CALL HBPROF(134,'Unused tracks (mult)$',20,0.5,20.5,0.,20.,' ')           
+       CALL HBPROF(135,'2ndry vtx (mult)$',20,0.5,20.5,0.,10.,' ')              
+       DO 62 IPL = 1,3                                                          
+         CALL HBPROF(400+IPL,'Res by strip$',400,.5,400.5,-.1,.1,' ')           
+         CALL HROTAT(400+IPL)                                                   
+  62   CONTINUE                                                                 
+      DO 27 JJ=1,3                                                              
+        DO 28 KK=1,400                                                          
+          CALL HFILL(130,STRDX(KK,JJ),0.,1.)                                    
+  28    CONTINUE                                                                
+  27  CONTINUE                                                                  
+*                                                                               
+*                                                                               
+* *************************************************************                 
+C                                                                               
++SELF,IF=MCARLOSI.                                                              
+*   Initiate GEANT                                                              
+* ---                                                                           
+* *> Set The Time (Last of December, 1987 at twelwe o'clock)                    
+      CALL UGDATE( 1987, 12, 02, 12.00, 1 )                                     
+* *> Set volumes active                                                         
+      ZMAX = 30.                                                                
+      CALL DISETS( ZMAX )                                                       
+      IDIFLG(11) = 1                                                            
+      CALL UGSETS( 'SILI', 1 )                                                  
+* *> Switch off  UGINIT extended printing                                       
+      CALL CEXIST( 'PRNT', .FALSE. )                                            
+******CALL CEXIST( 'ERRP', .FALSE. )                                            
+* *> SELECT GEOMETRY                                                            
+      CALL CEXIST('ALL ',.FALSE.)                                               
+      CALL CEXIST('SILI',.TRUE.)                                                
+      CALL CEXIST('SIL1',.TRUE.)                                                
+      CALL CEXIST('SIL2',.TRUE.)                                                
+      CALL CEXIST('SIL3',.TRUE.)                                                
+* *> Initialize the geometry                                                    
+      CALL  UGINIT                                                              
+* *> Decrease step size around Si-strips                                        
+      CALL UGSMED(37,0.01,IERR)                                                 
+CCCCCCCALL GPMATE(0)                                                            
+C     CALL GPTMED(0)                                                            
+CCCCCCCALL UGPVOL(0)                                                            
+* *> Initialize GEANT particle tables                                           
+      CALL GPART                                                                
+* *> Initialize GEANT physics processes                                         
+      CALL GPHYSI                                                               
+* *************************************************************                 
+C                                                                               
++SELF.                                                                          
+*                                                                               
+*                                                                               
+       RETURN                                                                   
+       END                                                                      
+*                                                                               
++DECK,MYEVNT.                                                                   
+       SUBROUTINE MYEVNT (ISTAT)                                                
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *               
+* *                                                           * *               
+* *                                                           * *               
+* *                                                           * *               
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *               
+*                                                                               
+* * >  PICKUP MY  COMMONS.                                                      
++CDE,MYCOUN.                                                                    
++CDE,SALLIO,SAPCTL,SAGNAM.                                                      
+* * >  PICKUP SI... COMMONS.                                                    
++CDE,SIADC.                                                                     
++CDE,SIFLAG.                                                                    
++CDE,SISTATUS.                                                                  
++CDE,SICTRK.                                                                    
++CDE,SICVRT.                                                                    
++CDE,SICV2N.                                                                    
+*                                                                               
+       DIMENSION  TEMPR ( 40 )                                                  
+       INTEGER   ITEMPR ( 40 )                                                  
+       EQUIVALENCE ( TEMPR (1) , ITEMPR (1))                                    
+       DIMENSION PBEAM(4)                                                       
+       DIMENSION IKEEPS(6)                                                      
+       LOGICAL VFBFLG,OK                                                        
+       LOGICAL FRVFB                                                            
+*                                                                               
+*---------------                                                                
++SELF,IF=-MCARLOSI.                                                             
+*---------------                                                                
+*                                                                               
+* * >  IF READ OUT PROBLEM                                                      
+*                                                                               
+       IF ( LBLENG ( 20016 ,1,1) .NE. 0 ) THEN                                  
+          RETURN                                                                
+       ENDIF                                                                    
+*                                                                               
+* * >  IF an end of burst is  read update scalers                               
+*                                                                               
+       IF ( LBLENG ( 21035 ,1,1) .NE. 0 ) THEN                                  
+          CALL FRSCAL (0)                                                       
+          RETURN                                                                
+       ENDIF                                                                    
+*                                                                               
+* * >  IF an run header  is read inform freja.                                  
+*                                                                               
+       IF ( LBLENG ( 21005 ,1,1) .NE. 0 ) THEN                                  
+          VFBFLG = .TRUE.                                                       
+          CALL FRHEAD(IDATE,ITIME,IRUN)                                         
+          WRITE(6,*)'IDATE,ITIME,IRUN = ',IDATE,ITIME,IRUN                      
+          IIRUN = IIRUN + 1                                                     
+          WRITE(6,*)'IIRUN = ',IIRUN                                            
+          RETURN                                                                
+       ENDIF                                                                    
+       CALL HFILL(48199,FLOAT(IIRUN),0.,1.)                                     
+CCCCC  IF ( IIRUN .LE. 2 ) RETURN                                               
+*                                                                               
+*---------------                                                                
++SELF,IF=MCARLOSI.                                                              
+*---------------                                                                
+* ******************************************************                        
+*  Handle the run header/initialization           ******                        
+* ******************************************************                        
+      IF( JLEVEN.EQ.-1 )THEN                                                    
+* *> Check for MC run header and create if not there already.                   
+        CALL MCSOR( 1 )                                                         
+        CALL LBSIGG( LGNAMS(1), 6 )                                             
+        JLEVEN = 0                                                              
+        RETURN                                                                  
+      ENDIF                                                                     
+* ******************************************************                        
+*  Handle the events                              ******                        
+* ******************************************************                        
+* *> Check for MC event header and create if not there already.                 
+      CALL MCEVH( 1 )                                                           
+* *> Increment event counter                                                    
+CCCCCCJLEVEN = JLEVEN + 1                                                       
+      WRITE(6,*)'EVENT',JLEVEN                                                  
+* *> Generate a single particle                                                 
+      ID = 8                                                                    
+      PBEAM( 1 ) = RNDM(JLEVEN)- 0.5                                            
+      PBEAM( 2 ) = 0.5                                                          
+      PBEAM( 3 ) = 10.0                                                         
+      CALL DISPRT( ID, PBEAM )                                                  
+* *> Tell Sandra about the new label                                            
+      CALL LBSIGG( LGNAMS( 09 ), 1 )                                            
+      IF( JLEVEN.LE.05 )CALL GPRINT( 'KINE', 0 )                                
+* *> Track the particles through the detector & make hits                       
+      CALL GTREVE                                                               
+* *> Tell Sandra about the new label                                            
+      CALL LBSIGG( LGNAMS( 10 ), 2 )                                            
+* *> Make the digitizings                                                       
+      CALL GUDIGI                                                               
+*---------------                                                                
++SELF.                                                                          
+*---------------                                                                
+*                                                                               
+* * >  One event found .                                                        
+*                                                                               
+       LABLEN = LBLENG ( 20015 )                                                
+       IF ( LABLEN .NE. 0 ) THEN                                                
+*                                                                               
+* ***> Only empty triggers ! <*******                                           
+         IF ( .NOT. FRVFB(20) ) THEN                                            
+           RETURN                                                               
+         ENDIF                                                                  
+       JLEVEN = JLEVEN +1                                                       
+*                                                                               
+* * >  First store information on event                                         
+*                                                                               
+          CALL LBCOPY ( 20015 , TEMPR , LABLEN ,1,-1,1 )                        
+C         *CALL FRTIME ( ITEMPR (8) , IDATE , ITIME )                           
+          IBURST     =   ITEMPR (17)                                            
+          IEVTBU     =   ITEMPR (18)                                            
+* * >  Process SI - STRIP data                                                  
+*                                                                               
+            CALL SIEVNT                                                         
+CCCC        IF ( ISIOK .NE. 0 ) THEN                                            
+C             WRITE(6,*)'ISIOK FROM SIEVNT = ',ISIOK                            
+CCCC        ENDIF                                                               
+CCCC        CALL SILTOC(IISTAT)                                                 
+CCCC        IF ( IISTAT .NE. 0 ) THEN                                           
+C             WRITE(6,*)'ISTAT FROM SILTOC = ',IISTAT                           
+CCCC        ENDIF                                                               
+       IF ( NUTRK .GE. 3 ) THEN                                                 
+         XV = SVERTX(1)                                                         
+         ZV = SVERTX(3)                                                         
+         CALL HFILL(120,SVERTX(3),0.,1.)                                        
+         CALL HFILL(121,SVERTX(1),0.,1.)                                        
+         CALL HFILL(122,SVERTX(3),SVERTX(1),1.)                                 
+         CALL HFILL(129,SVERTX(3),SVERTX(1),1.)                                 
+         CALL HFILL(123,ZV,0.,1.)                                               
+         IF ( ABS(XV) .GT. 0.0150 ) THEN                                        
+           CALL HFILL(124,ZV,0.,1.)                                             
+         ENDIF                                                                  
+         IF ((ZV .LT. -0.5 ).OR.(ZV .GT. 2.5 )) THEN                            
+           CALL HFILL(125,XV,0.,1.)                                             
+         ENDIF                                                                  
+         CHINDF = CHIVRX/NUTRK                                                  
+         IF((ABS(XV).LT.0.0150).AND.(ZV .GT.-0.5).AND.(ZV.LT.2.5))THEN          
+           CALL HFILL(126,CHINDF,0.,1.)                                         
+         ELSE                                                                   
+           CALL HFILL(127,CHINDF,0.,1.)                                         
+           IF ( CHINDF .LT. 3. ) THEN                                           
+             CALL HFILL(128,ZV,XV,1.)                                           
+           ENDIF                                                                
+         ENDIF                                                                  
+         CALL HFILL(133,FLOAT(NTRKSI),CHINDF,1.)                                
+         CALL HFILL(134,FLOAT(NTRKSI),FLOAT(NTRKSI-NUTRK),1.)                   
+         CALL HFILL(135,FLOAT(NTRKSI),FLOAT(N2VERT),1.)                         
+       ENDIF                                                                    
+*                                                                               
+*                                                                               
+         NEVENT = NEVENT + 1                                                    
+* *> Write the event, if you want.                                              
+* *> The labels in IKEEPS are the complete output from Si-strip                 
+* *> pattern recognition.                                                       
+CCCCCCCCIKEEPS(1) = +4                                                          
+C       IKEEPS(2) = 4417                                                        
+C       IKEEPS(3) = 4517                                                        
+C       IKEEPS(4) = 4617                                                        
+C       IKEEPS(5) = 4447                                                        
+C       IKEEPS(6) = 4547                                                        
+CCCCCCCCCALL LBEDIT(IKEEPS,1)                                                   
+CCCCCCCCLWREVT = .TRUE.                                                         
+CCCCCCCCCALL LBLIST(1)                                                          
+*                                                                               
+       ENDIF                                                                    
+* *> That's it                                                                  
+*                                                                               
+       RETURN                                                                   
+       END                                                                      
+*                                                                               
++DECK,MYOUT.                                                                    
+       SUBROUTINE MYOUT                                                         
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *               
+*                                                                               
+      LOGICAL HHOUT                                                             
+      DIMENSION CONTEN(400)                                                     
++CDE,MYCOUN.                                                                    
+*                                                                               
+      CALL HPRINT(0)                                                            
+      HHOUT = .FALSE.                                                           
+      IF ( HHOUT ) THEN                                                         
+        CALL VMCMS('FILEDEF 1 DISK SI HBOOK4 A6 (XTENT 300',IERR)               
+        OPEN(UNIT=1,FORM='UNFORMATTED',RECL=4096,ACCESS='DIRECT'                
+     *    ,STATUS='UNKNOWN')                                                    
+        CALL HRFILE(1,'EMU','N')                                                
+        WRITE(6,*)'HROUT : '                                                    
+        ICYCLE = 1                                                              
+        CALL HROUT(0,ICYCLE,' ')                                                
+        WRITE(6,*)'HREND : '                                                    
+        CALL HREND('EMU')                                                       
+        WRITE(6,*)'HREND finished.'                                             
+      ENDIF                                                                     
+CCCC  W = 1./JLEVEN                                                             
+C     WRITE(6,*)'W = ',W                                                        
+C     DO 20 I = 1,3                                                             
+C       CALL HUNPAK(47700+I,CONTEN,'HIST',0)                                    
+C       DO 25 J=1,400                                                           
+C         WRITE(6,*)CONTEN(J)*W                                                 
+C25     CONTINUE                                                                
+C20CC CONTINUE                                                                  
+      DO 14 I=1,3                                                               
+C       WRITE(6,*)'Residues by strip, plane ',I                                 
+        CALL HUNPAK(400+I,CONTEN,'HIST',1)                                      
+        WRITE(6,822)CONTEN                                                      
+ 822    FORMAT(1X,8F9.5)                                                        
+        DO 17 JJ=1,400                                                          
+          CALL HFILL(131,CONTEN(JJ),0.,1.)                                      
+  17    CONTINUE                                                                
+  14  CONTINUE                                                                  
+      CALL HPRINT(131)                                                          
+*                                                                               
+      WID = 1./40.                                                              
+      DO 10 I=1,3                                                               
+        CALL HUNPAK(47262+I,CONTEN,'HIST',1)                                    
+        TOT = 0.                                                                
+        DO 20 J=1,40                                                            
+          TOT = TOT + CONTEN(J)                                                 
+ 20     CONTINUE                                                                
+        X = 0.                                                                  
+        DO 30 J=1,40                                                            
+          X = X+CONTEN(J)                                                       
+          WRITE(6,233)WID*J,X/TOT                                               
+ 233      FORMAT(1X,2F10.5)                                                     
+  30    CONTINUE                                                                
+  10  CONTINUE                                                                  
+C                                                                               
+      RETURN                                                                    
+      END                                                                       
++DECK,SIDATA.                                                                   
+C                                                                               
+      SUBROUTINE SIDATA                                                         
+C                                                                               
+C***********************************************************************        
+C                                                                               
+C        M.S.D. data (used to be BLOCK DATA)                                    
+C                                                                               
+C***********************************************************************        
+C                                                                               
++CDE,SIMCNS.                                                                    
++CDE,SIMDAT                                                                     
++CDE,SIMPH                                                                      
++CDE,SIUGC.                                                                     
++CDE,SIALIGN.                                                                   
++CDE,SIKLUS.                                                                    
++CDE,SICOM.                                                                     
+C                                                                               
+      DIMENSION BBDUM(40,3)                                                     
++SELF,IF=SIAL88.                                                                
+      DATA BBDUM/40*0.0                                                         
+     *          , -1., -2., -5.,  5., 32., 22., 40.,  6.,-12.,-20.              
+     *          ,  0., -3.,  1., -9.,-12., -9.,  0.,  1.,  0., -2.              
+     *          , -9.,  1., -4., -4.,  2.,  3.,  9.,  9.,-10., -6.              
+     *          , -5.,-10., -1.,  1.,  3.,-10., -5., -7.,-11.,  0.              
+     *          ,40*0.0/                                                        
++SELF.                                                                          
+      DATA BBDUM/120*0.0/                                                       
+C                                                                               
+C        Detector                                                               
+C                                                                               
+      NUMDET = 3                                                                
+      NAMSET = 'SILI'                                                           
+      NAMDET(1) = 'SIL1'                                                        
+      NAMDET(2) = 'SIL2'                                                        
+      NAMDET(3) = 'SIL3'                                                        
+C                                                                               
+      SICHAN(1) = 400.                                                          
+      SICHAN(2) = 400.                                                          
+      SICHAN(3) = 400.                                                          
+      SILPIT(1) = 0.0025                                                        
+      SILPIT(2) = 0.0025                                                        
+      SILPIT(3) = 0.0025                                                        
+      LRDPIT(1) = 2                                                             
+      LRDPIT(2) = 4                                                             
+      LRDPIT(3) = 6                                                             
+      STRWID = 0.0025                                                           
+*                                                                               
+      SILDIS(1) = -0.75                                                         
+      SILDIS(2) = -1.50                                                         
+      SILDIS(3) = -2.25                                                         
++SELF,IF=SIAL88.                                                                
+      SILPOS(1) =  6.         +2. + 0.114 - 0.07 - 0.07                         
+      SILPOS(2) = 12. + 0.268 +2. + 0.114 - 0.13 - 0.13                         
+      SILPOS(3) = 18.         +2. + 0.114 - 0.19 - 0.19                         
++SELF,IF=SIAL89.                                                                
+      SILPOS(1) =  6.         +2. + 0.114 - 0.07 - 0.07                         
+      SILPOS(2) = 12. + 0.222 +2. + 0.114 - 0.13 - 0.13                         
+      SILPOS(3) = 18.         +2. + 0.114 - 0.19 - 0.19                         
++SELF.                                                                          
+*                                                                               
+      DO 10 J=1,3                                                               
+        ISICHA(J) = 400                                                         
+        SIDEAD(J) = 0.05                                                        
+        NFLOAT(J) = J                                                           
+        ERC1H2(J) = 0.0010                                                      
+        SIDX(J)   = 0.                                                          
+        SIDZ(J)   = 0.                                                          
+        AAX(J)  = 0.                                                            
+        BBY(J) = 0.                                                             
+        STHICK(J) = 0.0300                                                      
+        SIDX(J) = 0.0                                                           
+ 10   CONTINUE                                                                  
+C                                                                               
+      IF ( .NOT. MCSI ) THEN                                                    
+CCCCCC  (** Alignments measured in 1987 data **)                                
+C       SIDX(1) = -0.0115 + 0.0020 - 0.0068          - 0.0004                   
+C       SIDX(2) = -0.1010 + 0.0115 - 0.0205 - 0.0075 + 0.0042                   
+CCCCCC  SIDX(3) = -0.0365 - 0.0249                   - 0.0038                   
+C       (** Alignments measured in 1988 data **)                                
++SELF,IF=SIAL88.                                                                
+        SIDX(1) = -0.0067 - 0.0040                                              
+        SIDX(2) = -0.0067 - 0.0080                                              
+        SIDX(3) = -0.0067 - 0.0120                                              
+C       AAX(1) = 0.01770                                                        
+C       AAX(2) = 0.00157                                                        
+CCCCCCCCAAX(3) = 0.00423                                                        
+C       BBY(1) = 0.00390                                                        
+C       BBY(2) = 0.00495                                                        
+CCCCCC  BBY(3) =-0.00005                                                        
++SELF.                                                                          
+*================== si strips alignment data for the 1989 ========*!^           
++SELF,IF=SIAL89. !^ try 1!^ try 2!^ try 3                                       
+CCC     SIDX(1) = -0.0259 -0.0026                        !^                     
+C       SIDX(2) = -0.0167 -0.0004                        !^ good                
+CCC     SIDX(3) = -0.0181 +0.0005                        !^                     
+Clsj    SIDX(1) = -0.0126                                                       
+C       SIDX(2) =  0.0          ! LSJ 891008, TEST                              
+CLSJ    SIDX(3) =  0.0097                                                       
+C                                                                               
+        SIDZ(2) =  0.0461                                                       
++SELF.                                                   !^                     
+                                                                                
+        DO 73 J=1,4                                                             
+          AALIN(J) = 0.0                                                        
+          BBLIN(J) = 0.0                                                        
+          DO 76 JJ=1,3                                                          
+            AAALIN(J,JJ) = 0.0                                                  
+            BBBLIN(J,JJ) = 0.0                                                  
+  76      CONTINUE                                                              
+  73    CONTINUE                                                                
++SELF,IF=SIAL88.                                                                
+CCCCCCCCAALIN(1) =  0.0421 + 0.0289 + 0.0217 + 0.0185 - 0.0129 - 0.0118         
+C       BBLIN(1) =  0.0508 + 0.0341 + 0.0247 + 0.0201 - 0.0125 - 0.0102         
+C       AALIN(2) = -0.0306 - 0.0218 - 0.0177 - 0.0156 + 0.0111 + 0.0103         
+C       BBLIN(2) =  0.0020 + 0.0009 + 0.0013 + 0.0011 - 0.0007 + 0.0013         
+C       AALIN(3) = -0.0149 - 0.0124 - 0.0107 - 0.0092 + 0.0076 + 0.0016         
+C       BBLIN(3) =  0.0023 + 0.0023 + 0.0026 + 0.0023          + 0.0009         
+C       AALIN(4) =  0.0950 + 0.0769 + 0.0397 + 0.0305 - 0.0042 + 0.0053         
+CCCCCCCCBBLIN(4) = -0.0607 - 0.0468 - 0.0207 - 0.0197 + 0.0030 - 0.0009         
+CCCCCCCCAALIN(1) = -0.0160 + 0.0020                                             
+C       BBLIN(1) =  0.0060 + 0.0010 + 0.0004                                    
+C       AALIN(2) =  0.0020 + 0.0020                                             
+C       BBLIN(2) =  0.0010 + 0.0007 + 0.0009                                    
+C       AALIN(3) = -0.0020 - 0.0008                                             
+C       BBLIN(3) =  0.0005 + 0.0010 + 0.0010                                    
+C       AALIN(4) = -0.0100 - 0.0020                                             
+CCCCCCCCBBLIN(4) =  0.0050          + 0.0009                                    
+        AAALIN(1,1) =-0.0100                                                    
+        BBBLIN(1,1) =-0.0051                                                    
+        AAALIN(2,1) =+0.0120                                                    
+        BBBLIN(2,1) =-0.0030                                                    
+        AAALIN(3,1) =-0.0006                                                    
+        BBBLIN(3,1) =-0.0020                                                    
+        AAALIN(4,1) = 0.0050                                                    
+        BBBLIN(4,1) = 0.0002                                                    
+        AAALIN(1,2) = 0.0022                                                    
+        BBBLIN(1,2) = 0.0107                                                    
+        AAALIN(2,2) =-0.0090 + 0.0030                                           
+        BBBLIN(2,2) = 0.0012                                                    
+        AAALIN(3,2) =-0.0069                                                    
+        BBBLIN(3,2) = 0.0022 - 0.0004                                           
+        AAALIN(4,2) =-0.0097 + 0.0020                                           
+        BBBLIN(4,2) = 0.0047 - 0.0025 + 0.0015                                  
+        AAALIN(1,3) = 0.0005                                                    
+        BBBLIN(1,3) =-0.0011                                                    
+        AAALIN(2,3) = 0.0018                                                    
+        BBBLIN(2,3) =-0.0006                                                    
+        AAALIN(3,3) = 0.0027                                                    
+        BBBLIN(3,3) =-0.0002                                                    
+        AAALIN(4,3) = 0.0016                                                    
+        BBBLIN(4,3) = 0.0007                                                    
+CCCCCCCCCALL VMCMS('FILEDEF 64 DISK SIBBFIX RUNCARD * (LRECL 80',IERR)          
+C       IF ( IERR .NE. 0 ) THEN                                                 
+C         WRITE(6,*)'IERR FROM SIBBFIX-FILEDEF = ',IERR                         
+C       ENDIF                                                                   
+CCCCCC  CALL VMCMS('QFILEDEF',IERR)                                             
++SELF.                                                                          
+        DO 83 J=1,40                                                            
+         DO 86 ISI = 1,3                                                        
+CCCCCCCC  BBFIX(J,ISI) = 0.0                                                    
+          BBFIX(J,ISI) = 0.0001*BBDUM(J,ISI)                                    
+CCCCC     READ(64,377)JJJ,BBFIX(J)                                              
+377       FORMAT(1X,I3,1X,F12.4)                                                
+CCCCCC   *IF ( BBFIX(J) .LT. -900. ) THEN                                       
+CCCCC       BBFIX(J) = 0.0                                                      
+CCCCCC   *ELSE                                                                  
+C        *  BBFIX(J) = 0.0001 * BBFIX(J)                                        
+CCCCCC   *ENDIF                                                                 
+CCCC      WRITE(6,377)J,BBFIX(J)                                                
+ 86      CONTINUE                                                               
+ 83     CONTINUE                                                                
++SELF,IF=SIAL88.                                                                
+        BBFIX(14,2) = BBFIX(14,2) -0.0060                                       
+        BBFIX(15,2) = BBFIX(14,2) -0.0060                                       
+CCCCCCC DO 74 J=1,4                                                             
+C         WRITE(6,722)AALIN(J),BBLIN(J)                                         
+C722      FORMAT(1X,2F10.4)                                                     
+C74CCCC CONTINUE                                                                
++SELF.                                                                          
+      ENDIF                                                                     
+C                                                                               
+CCC   KPTMIN(1) = 110                                                           
+C     KPTMIN(2) = 130                                                           
+C     KPTMIN(3) = 200                                                           
+C     KLCMIN(1) =  40                                                           
+C     KLCMIN(2) =  50                                                           
+CCC   KLCMIN(3) =  75                                                           
+      KPTMIN(1) = 100                                                           
+      KPTMIN(2) = 100                                                           
+      KPTMIN(3) = 100                                                           
+      KLCMIN(1) =  18                                                           
+      KLCMIN(2) =  18                                                           
+      KLCMIN(3) =  18                                                           
+C                                                                               
+      IF ( CHITRC .LT. 0.001 ) THEN                                             
+        CHITRC = 20.                                                            
+      ENDIF                                                                     
+C                                                                               
+      NPRTSI = 50                                                               
+      JPRTSI =  0                                                               
+      WRITE(6,*)'Reading STRDX DATA'                                            
+      CALL VMCMS('FILEDEF 61 DISK STRDX DATA *',IERR)                           
+      READ(61,922)STRDX                                                         
+ 922  FORMAT(1X,8F9.5)                                                          
+C                                                                               
+      RETURN                                                                    
+      END                                                                       
++DECK,SIINIS.                                                                   
+*                                                                               
+       SUBROUTINE SIINIS                                                        
+*                                                                               
+******************************************************************              
+*                                                                               
+*     To be called from MYINI or ABY's SIINIT                                   
+*                                                                               
+*     Input : FLAGS(10)  : LOGICAL ARRAY                                        
+*                                                                               
+*     IF ( FLAGS(1) ) THEN    MCarlo                                            
+*          FLAGS(2)           Hit reconstruction to be done                     
+*          FLAGS(3)           Track reconstruction    "                         
+*          FLAGS(4)           Vertex reconstruction   "                         
+*          FLAGS(5)           MC debugging histograms                           
+*          FLAGS(6)           "Normal" analysis histograms                      
+*          FLAGS(7)           Debugging/calibration hists                       
+*                               ( general )                                     
+*          FLAGS(8)           Debugging/calibration hists                       
+*                               ( strip by strip )                              
+*          FLAGS(9)           Debugging/calibration hists                       
+*                               ( event by event )                              
+*          FLAGS(10)          Lucifer tracks present,                           
+*                             to be joined with Si info.                        
+*                                                                               
+******************************************************************              
+*                                                                               
++CDE,SICOM.                                                                     
++CDE,SIMDAT.                                                                    
++CDE,SIADCS.                                                                    
++CDE,SIXREF.                                                                    
++CDE,SICETA.                                                                    
++CDE,SIPEDS.                                                                    
++CDE,SIPULS.                                                                    
++CDE,SIALSM.                                                                    
++CDE,SIALS2.                                                                    
+*                                                                               
+        LOGICAL FLAGS(10)                                                       
+        DIMENSION IH0(3)                                                        
+        CHARACTER*30 HNAME                                                      
+        DATA IH0 / 44000,45000,46000/                                           
+*                                                                               
+        DO 83 JJ=1,4                                                            
+          SX(JJ) = 0                                                            
+          SX2(JJ) = 0                                                           
+          SX3(JJ) = 0                                                           
+          SX4(JJ) = 0                                                           
+          SR(JJ) = 0                                                            
+          SRX(JJ) = 0                                                           
+          SRX2(JJ) = 0                                                          
+          NSS(JJ) = 0                                                           
+          DO 85 J=1,3                                                           
+            SSX(JJ,J) = 0.                                                      
+            SSX2(JJ,J) = 0.                                                     
+            SSRX(JJ,J) = 0.                                                     
+            SSR(JJ,J) = 0.                                                      
+ 85       CONTINUE                                                              
+ 83     CONTINUE                                                                
+        DO 36 JJ=1,400                                                          
+          NSTRK(JJ) = 0                                                         
+          RSTRK(JJ) = 0.0                                                       
+ 36     CONTINUE                                                                
+*                                                                               
+        CALL SIDATA                                                             
+*                                                                               
+        CALL SIRCAL                                                             
+*                                                                               
++SELF,IF=SIRDHIST.                                                              
+        CALL VMCMS('FILEDEF 2 DISK SIALL HBOOK4 * (XTENT 200',IERR)             
+        OPEN(UNIT=2,FORM='UNFORMATTED',RECL=4096,ACCESS='DIRECT'                
+     *    ,STATUS='UNKNOWN')                                                    
+        CALL HRFILE(2,'SI',' ')                                                 
+        ICYCLE = 1                                                              
+        CALL HRIN(0,ICYCLE,0)                                                   
+        CALL HREND('SI')                                                        
+        CLOSE(2)                                                                
+        CALL HINDEX                                                             
++SELF,IF=-SIRDHIST.                                                             
+C                                                                               
+        IF ( FLAGSI(1) ) THEN                                                   
+          CALL HBOOK1(47101,'Energy loss in Si.$',40,0.,400.E-6,0)              
+          CALL HBOOK1(47102,'Cluster width.$',12,0.5,12.5,0)                    
+          CALL HBOOK1(47103,'XIN/SILPIT$',40,0.,1.,0)                           
+          CALL HBOOK1(47104,'LADC with noise$',40,0,1000.,0)                    
+          CALL HBOOK1(47105,'Highest LADC$',40,0.,8000.,0)                      
+          CALL HBOOK1(47111,'# hits, plane 1$',10,-0.5,9.5,0)                   
+          CALL HBOOK1(47112,'# hits, plane 2$',10,-0.5,9.5,0)                   
+          CALL HBOOK1(47113,'# hits, plane 3$',10,-0.5,9.5,0)                   
+          CALL HBOOK1(47114,'LADC without noise$',40,0.,1000.,0)                
+          IF ( FLAGSI(2) ) THEN                                                 
+            CALL HBOOK2(47115,'X(track) vs #hits found$',40,-2.,2.              
+     *                   ,5,-0.5,4.5,0)                                         
+          ENDIF                                                                 
+        ENDIF                                                                   
+        IF ( FLAGSI(6) ) THEN                                                   
+          IF ( FLAGSI(2) ) THEN                                                 
+            CALL HBOOK1(47201,'ETA$',50,0.,1.,0)                                
+            CALL HBOOK1(47203,'# strips/cluster$',20,0.5,20.5,0)                
+            CALL HBOOK1(47204,'Total PH/cluster$',40,0.,2E3,0)                  
+            CALL HBOOK1(47211,'# hits found, Si1$',30,-0.5,29.5,0)              
+            CALL HBOOK1(47212,'# hits found, Si2$',30,-0.5,29.5,0)              
+            CALL HBOOK1(47213,'# hits found, Si3$',30,-0.5,29.5,0)              
+            CALL HBOOK2(47214,'PH/cluster vs. # strips$',40,0.,4E3              
+     *                  ,20,0.5,20.5,0)                                         
+            CALL HBOOK1(47215,'Highest cluster$',40,0.,2E3,0)                   
+            CALL HBOOK1(47216,'NON-highest cluster$',40,0.,2E3,0)               
+            CALL HBOOK1(47217,'Str. reconstr.hits 1$',40,0.,400.,0)             
+            CALL HBOOK1(47218,'Str. reconstr.hits 2$',40,0.,400.,0)             
+            CALL HBOOK1(47219,'Str. reconstr.hits 3$',40,0.,400.,0)             
+            CALL HBOOK2(47220,'X vs #hits$',40,-2.,2.,20,-0.5,19.5,0)           
+            CALL HBOOK1(47222,'Linear ETA, Si1$',40,0.,1.,0)                    
+            CALL HBOOK1(47223,'Linear ETA, Si2$',40,0.,1.,0)                    
+            CALL HBOOK1(47224,'Linear ETA, Si3$',40,0.,1.,0)                    
+            CALL HINTEG(47222,'YES ')                                           
+            CALL HINTEG(47223,'YES ')                                           
+            CALL HINTEG(47224,'YES ')                                           
+            CALL HBOOK1(47225,'XHIT, Si1$',60,-0.30,0.30,0)                     
+            CALL HBOOK1(47226,'XHIT, Si2$',60,-0.30,0.30,0)                     
+            CALL HBOOK1(47227,'XHIT, Si3$',60,-0.30,0.30,0)                     
+            CALL HBOOK2(47228,'Pad vs. strip multipl.$',40,-0.5,39.5            
+     *                                                 ,40,-0.5,39.5,0)         
+            CALL HBOOK1(47229,'# hits in multiclusters$',10,-0.5,9.5,0)         
+            IF ( FLAGSI(7) ) THEN                                               
+              CALL HBOOK1(47230,'dx, hits in mult.cl.$',40,0.,0.2,0)            
+              CALL HBOOK2(47231,'# hits vs. # strips, multiclust.$'             
+     *                        ,10,-0.5,9.5,10,-0.5,19.5,0)                      
+              CALL HBOOK2(47232,'PH vs. # strips, GOOD$',40,0.,4E3              
+     *                    ,20,0.5,20.5,0)                                       
+              CALL HBOOK2(47233,'PH vs. # strips, BAD$',40,0.,4E3               
+     *                    ,20,0.5,20.5,0)                                       
+              CALL HBOOK1(47234,'PH, Good clusters$',40,0.,1E3,0)               
+              CALL HBOOK1(47235,'PH, Bad clusters$',40,0.,1E3,0)                
+              CALL HBOOK1(47236,'Non-linear ETA, Si1$',40,0.,1.,0)              
+              CALL HBOOK1(47237,'Non-Linear ETA, Si2$',40,0.,1.,0)              
+              CALL HBOOK1(47238,'Non-Linear ETA, Si3$',40,0.,1.,0)              
+              IF ( NLIPOL ) THEN                                                
+                CALL HBOOK2(47239,'Lin. vs. nonlin Eta,Si1$',40,0.,1.           
+     *                                                   ,40,0.,1.,0)           
+                CALL HBOOK2(47240,'Lin. vs. nonlin Eta,Si2$',40,0.,1.           
+     *                                                    ,40,0.,1.,0)          
+                CALL HBOOK2(47241,'Lin. vs. nonlin Eta,Si3$',40,0.,1.           
+     *                                                    ,40,0.,1.,0)          
+              ENDIF                                                             
+            ENDIF                                                               
+            CALL HBOOK1(47242,'# strips/cluster pl1$',20,0.5,20.5,0)            
+            CALL HBOOK1(47243,'# strips/cluster pl2$',20,0.5,20.5,0)            
+            CALL HBOOK1(47244,'# strips/cluster pl3$',20,0.5,20.5,0)            
+            CALL HBOOK1(47248,'PH, all hits$',40,0.,2000.,0)                    
+            IF ( .NOT. OLDHB ) THEN                                             
+              CALL HBPROF(47251,'PH(eta), Si1$',40,0.,1.,0.,2000.,' ')          
+              CALL HBPROF(47252,'PH(eta), Si2$',40,0.,1.,0.,2000.,' ')          
+              CALL HBPROF(47253,'PH(eta), Si3$',40,0.,1.,0.,2000.,' ')          
+            ENDIF                                                               
+            CALL HBOOK1(47254,'PH, used hits, Si1$',40,0.,2000.,0)              
+            CALL HBOOK1(47255,'PH, used hits, Si2$',40,0.,2000.,0)              
+            CALL HBOOK1(47256,'PH, used hits, Si3$',40,0.,2000.,0)              
+            CALL HBOOK1(47257,'PH, unused hits, Si1$',40,0.,2000.,0)            
+            CALL HBOOK1(47258,'PH, unused hits, Si2$',40,0.,2000.,0)            
+            CALL HBOOK1(47259,'PH, unused hits, Si3$',40,0.,2000.,0)            
+            CALL HBOOK1(47260,'#strip/cl. used Si1$',20,0.5,20.5,0)             
+            CALL HBOOK1(47261,'#strip/cl. used Si2$',20,0.5,20.5,0)             
+            CALL HBOOK1(47262,'#strip/cl. used Si3$',20,0.5,20.5,0)             
+            CALL HBOOK1(47263,'ETA, used Si1$',40,0.,1.,0)                      
+            CALL HBOOK1(47264,'ETA, used Si2$',40,0.,1.,0)                      
+            CALL HBOOK1(47265,'ETA, used Si3$',40,0.,1.,0)                      
+          ENDIF                                                                 
+          IF ( FLAGSI(3) ) THEN                                                 
+            CALL HBOOK1(47301,'Residue plane 1$',40,-0.01,0.01,0)               
+            CALL HBOOK1(47302,'Residue plane 2$',40,-0.01,0.01,0)               
+            CALL HBOOK1(47303,'Residue plane 3$',40,-0.01,0.01,0)               
+            CALL HBSTAT(47301)                                                  
+            CALL HBSTAT(47302)                                                  
+            CALL HBSTAT(47303)                                                  
+            CALL HBOOK1(47304,'# tracks found$',30,-0.5,29.5,0)                 
+            CALL HBOOK1(47305,'Slope$',40,-0.25,0.25,0)                         
+            CALL HBOOK1(47306,'Intercept$',40,-1.,1.,0)                         
+*           *CALL HBOOK1(47307,'Chi-2, tracks$',40,0.,0.0002,0)                 
+            CALL HBOOK1(47307,'Chi-2, tracks$',40,0.,8.,0)                      
+            CALL HBOOK2(47308,'# tracks vs. # hits$',10,-0.5,9.5                
+     *                                              ,30,-0.25,59.75,0)          
+            CALL HBOOK2(47309,'Slope vs. intercept$',10,-0.25,0.25              
+     *                                              ,10,-2.,2.,0)               
+            CALL HBOOK1(47310,'Residue plane 2$',40,-0.2,0.2,0)                 
+            CALL HBOOK1(47311,'"Dead" tracks$',10,-0.5,9.5,0)                   
+            CALL HBOOK1(47312,'"Dead"+good tracks$',10,-0.5,9.5,0)              
+            CALL HBOOK2(47313,'Chi2 vs icept$',20,0.,8.,20,-2.,2.,0)            
+            CALL HBOOK1(47314,'dz of zero icept, pl2$',40,-2.,2.,0)             
+            IF ( FLAGSI(7) ) THEN                                               
+              CALL HBOOK1(47315,'Res pl 1 wO vertex$',40,-0.04,0.04,0)          
+              CALL HBOOK1(47316,'Res pl 2 wO vertex$',40,-0.04,0.04,0)          
+              CALL HBOOK1(47317,'Res pl 3 wO vertex$',40,-0.04,0.04,0)          
+              IF ( .NOT. OLDHB ) THEN                                           
+                CALL HBPROF(47318,'Residu pl 1 vs eta$',40,0.,1.                
+     *                            ,-0.01,0.01,' ')                              
+                CALL HBPROF(47319,'Residu pl 2 vs eta$',40,0.,1.                
+     *                              ,-0.01,0.01,' ')                            
+                CALL HBPROF(47320,'Residu pl 3 vs eta$',40,0.,1.                
+     *                            ,-0.01,0.01,' ')                              
+              ENDIF                                                             
+              CALL HBOOK1(47321,'Residu pl1 2str-hit$',40,-0.01,0.01,0)         
+              CALL HBOOK1(47322,'Residu pl2 2str-hit$',40,-0.01,0.01,0)         
+              CALL HBOOK1(47323,'Residu pl3 2str-hit$',40,-0.01,0.01,0)         
+            ENDIF                                                               
+            CALL HBOOK1(47324,'Residu/sigma pl1$',40,-4.,4.,0)                  
+            CALL HBOOK1(47325,'Residu/sigma pl2$',40,-4.,4.,0)                  
+            CALL HBOOK1(47326,'Residu/sigma pl3$',40,-4.,4.,0)                  
+            CALL HBOOK2(47327,'Res vs. Chi2$',20,-0.01,0.01,20,0.,8.,0)         
+            CALL HBOOK2(47328,'Res vs.Icept$',20,-0.01,0.01,20,-1.,1.,0)        
+            CALL HBOOK1(47329,'Res, Icept<0.2$',40,-0.01,0.01,0)                
+            CALL HBOOK1(47330,'Res, Icept>0.2$',40,-0.01,0.01,0)                
+            CALL HBOOK1(47331,'Intertrack dist. slope$',40,0.,0.02,0)           
+            CALL HBOOK1(47332,'Intertrack dist. x at z=15$',40,0.,0.1,0)        
+            CALL HBOOK1(47333,'Sigma(slope)  of tracks$',40,0.,0.004,0)         
+            CALL HBOOK1(47334,'Sigma(offset) of tracks$',40,0.,0.004,0)         
+          ENDIF                                                                 
+          IF ( FLAGSI(4) ) THEN                                                 
+            CALL HBOOK1(47351,'Residue pl 1,new trk$',40,-0.01,0.01,0)          
+            CALL HBOOK1(47352,'Residue pl 2,new trk$',40,-0.01,0.01,0)          
+            CALL HBOOK1(47353,'Residue pl 3,new trk$',40,-0.01,0.01,0)          
+            CALL HBSTAT(47351)                                                  
+            CALL HBSTAT(47352)                                                  
+            CALL HBSTAT(47353)                                                  
+            CALL HBOOK1(47354,'Total # tracks Found$',20,-0.5,19.5,0)           
+            CALL HBOOK1(47355,'Slope, new tracks$',40,-0.25,0.25,0)             
+            CALL HBOOK1(47356,'Intercept, new tracks$',40,-4.,4.,0)             
+            CALL HBOOK1(47357,'Chi-2, new tracks$',40,0.,0.0002,0)              
+            CALL HBOOK2(47358,'# total tracks vs. # hits$',                     
+     *                                 10,-0.5,9.5,30,-0.25,59.75,0)            
+            CALL HBOOK2(47359,'Slope vs. intercept,new tracks$'                 
+     *                                   ,10,-0.25,0.25,10,-2.,2.,0)            
+            CALL HBOOK1(47360,'New tracks found$',20,-0.5,19.5,0)               
+*                                                                               
+            CALL HBOOK1(47401,'Vertex X$',60,-.04,.04,0)                        
+C           *CALL HBOOK1(47402,'Vertex Y$',40,-1.,1.,0)                         
+            CALL HBOOK1(47403,'Vertex Z$',60,-2.,4.,0)                          
+            CALL HBOOK1(47404,'Impact parameter$',60,-.02,.02,0)                
+            CALL HBOOK1(47408,'Impact parameter no cut$',60,-.2,.2,0)           
+            CALL HBOOK1(47405,'Chi2 vertex$',40,0.,20.,0)                       
+            CALL HBOOK1(47406,'# tracks in vertex$',20,.5,20.5,0)               
+            CALL HBOOK1(47407,'# tracks out vertex$',20,-.5,19.5,0)             
+            IF ( FLAGSI(7) ) THEN                                               
+              CALL HBOOK1(47410,'dSlope tr w/ vertex$',40,-0.01,0.01,0)         
+              CALL HBOOK1(47411,'dICept tr w/ vertex$',40,-0.01,0.01,0)         
+              CALL HBOOK1(47412,'Res pl 1 w/ vertex$',40,-0.01,0.01,0)          
+              CALL HBOOK1(47413,'Res pl 2 w/ vertex$',40,-0.01,0.01,0)          
+              CALL HBOOK1(47414,'Res pl 3 w/ vertex$',40,-0.01,0.01,0)          
+              CALL HBOOK1(47415,'Res pl 1 wO vertex$',40,-0.01,0.01,0)          
+              CALL HBOOK1(47416,'Res pl 2 wO vertex$',40,-0.01,0.01,0)          
+              CALL HBOOK1(47417,'Res pl 3 wO vertex$',40,-0.01,0.01,0)          
+              CALL HBOOK1(47418,'Res pl2, used tr$',40,-0.01,0.01,0)            
+              CALL HBOOK2(47419,'Res w vtx vs. a, pl1$',20,-0.01,0.01           
+     *                   ,20,-0.1,0.1,0)                                        
+              CALL HBOOK2(47420,'Res w vtx vs. a, pl2$',20,-0.01,0.01           
+     *                   ,20,-0.1,0.1,0)                                        
+              CALL HBOOK2(47421,'Res w vtx vs. a, pl3$',20,-0.01,0.01           
+     *                   ,20,-0.1,0.1,0)                                        
+              CALL HBOOK1(47422,'Chi2, track in vtx$',40,0.,8.,0)               
+              CALL HBOOK1(47423,'Chi2, track NOT in vtx$',40,0.,8.,0)           
+              IF ( .NOT. OLDHB ) THEN                                           
+                CALL HBPROF(47424,'Res w vtx vs str, pl1$',40,0.5,400.5         
+     *                  ,-0.01,0.01,' ')                                        
+                CALL HBPROF(47425,'Res w vtx vs str, pl2$',40,0.5,400.5         
+     *                  ,-0.01,0.01,' ')                                        
+                CALL HBPROF(47426,'Res w vtx vs str, pl3$',40,0.5,400.5         
+     *                  ,-0.01,0.01,' ')                                        
+                CALL HBPROF(47427,'Resisdu vs str, pl2$',40,0.5,400.5           
+     *                  ,-0.01,0.01,' ')                                        
+              ENDIF                                                             
+            ENDIF                                                               
+            IF ( VX2REC ) THEN                                                  
+              CALL HBOOK1(47450,'# 2ndry vertices$',11,-0.5,10.5,0)             
+              CALL HBOOK1(47451,'# tracks/2ndry vertex$',9,-0.5,8.5,0)          
+              CALL HBOOK1(47452,'z of 2ndry vertex$',40,-2.,8.,0)               
+              CALL HBOOK1(47453,'dz, 2nd-prim vertex$',40,-2.,8.,0)             
+            ENDIF                                                               
+          ENDIF                                                                 
+        ENDIF                                                                   
+*                                                                               
+        IF ( FLAGSI(7) ) THEN                                                   
+          CALL HBOOK1(47701,'Accumulated PHs, # 1$',400,0.5,400.5,0)            
+          CALL HBOOK1(47702,'Accumulated PHs, # 2$',400,0.5,400.5,0)            
+          CALL HBOOK1(47703,'Accumulated PHs, # 3$',400,0.5,400.5,0)            
+          CALL HROTAT(47701)                                                    
+          CALL HROTAT(47702)                                                    
+          CALL HROTAT(47703)                                                    
+          CALL HBOOK2(47704,'Residue vs. X, p1$',40,-0.01,0.01,                 
+     *                 20,-1.,1.,0)                                             
+          CALL HBOOK2(47705,'Residue vs. X, p2$',60,-0.02,0.02,                 
+     *                 40,-1.5,1.5,0)                                           
+          CALL HBOOK2(47706,'Residue vs. X, p3$',40,-0.01,0.01,                 
+     *                 20,-2.,2.,0)                                             
+          CALL HBOOK1(47707,'Residue, x < -0.5$',40,-0.02,0.02,0)               
+          CALL HBOOK1(47708,'Residue, abs(x) < 0.5$',40,-0.02,0.02,0)           
+          CALL HBOOK1(47709,'Residue, x > 0.5$',40,-0.02,0.02,0)                
+          CALL HBOOK1(47730,'Residue, str 1-100$',60,-0.01,0.01,0)              
+          CALL HBOOK1(47731,'Residue, str 101-150$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47732,'Residue, str 151-200$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47733,'Residue, str 201-250$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47734,'Residue, str 251-300$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47735,'Residue, str 301-400$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47736,'Strip of track$',40,0.5,400.5,0)                   
+          CALL HBOOK1(47737,'Residue, dead neighb$',40,-0.01,0.01,0)            
+          CALL HBOOK1(47740,'Residue, str   1- 10$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47741,'Residue, str  10- 20$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47742,'Residue, str  21- 30$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47743,'Residue, str  31- 40$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47744,'Residue, str  41- 50$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47745,'Residue, str  51- 60$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47746,'Residue, str  61- 70$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47747,'Residue, str  71- 80$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47748,'Residue, str  81- 90$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47749,'Residue, str  91-100$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47750,'Residue, str 101-110$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47751,'Residue, str 111-120$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47752,'Residue, str 121-130$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47753,'Residue, str 131-140$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47754,'Residue, str 141-150$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47755,'Residue, str 151-160$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47756,'Residue, str 161-170$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47757,'Residue, str 171-180$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47758,'Residue, str 181-190$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47759,'Residue, str 191-200$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47760,'Residue, str 201-210$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47761,'Residue, str 211-220$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47762,'Residue, str 221-230$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47763,'Residue, str 231-240$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47764,'Residue, str 241-250$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47765,'Residue, str 251-260$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47766,'Residue, str 261-270$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47767,'Residue, str 271-280$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47768,'Residue, str 281-290$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47769,'Residue, str 291-300$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47770,'Residue, str 301-310$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47771,'Residue, str 311-320$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47772,'Residue, str 321-330$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47773,'Residue, str 331-340$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47774,'Residue, str 341-350$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47775,'Residue, str 351-360$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47776,'Residue, str 361-370$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47777,'Residue, str 371-380$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47778,'Residue, str 381-390$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47779,'Residue, str 391-400$',60,-0.01,0.01,0)            
+          CALL HBOOK1(47711,'PHs all channels Si1$',40,0.5,800.,0)              
+          CALL HBOOK1(47712,'PHs all channels Si2$',40,0.5,800.,0)              
+          CALL HBOOK1(47713,'PHs all channels Si3$',40,0.5,800.,0)              
+          CALL HBOOK1(47714,'Highest PH, Si1$',40,0.,2E3,0)                     
+          CALL HBOOK1(47715,'Highest PH, Si2$',40,0.,2E3,0)                     
+          CALL HBOOK1(47716,'Highest PH, Si3$',40,0.,2E3,0)                     
+          CALL HBOOK1(47717,'Highest PH + neighb.,Si1$',40,0.,2E3,0)            
+          CALL HBOOK1(47718,'Highest PH + neighb.,Si2$',40,0.,2E3,0)            
+          CALL HBOOK1(47719,'Highest PH + neighb.,Si3$',40,0.,2E3,0)            
+          CALL HBOOK1(47720,'NHITS/channel Si1$',400,0.5,400.5,0)               
+          CALL HBOOK1(47721,'NHITS/channel Si2$',400,0.5,400.5,0)               
+          CALL HBOOK1(47722,'NHITS/channel Si3$',400,0.5,400.5,0)               
+          CALL HBOOK1(47723,'PH, live channels$',40,0.,1E5,0)                   
+          CALL HBOOK1(47724,'PH, dead channels.$',40,0.,1E5,0)                  
+          CALL HBOOK1(47725,'PH, ch. with live neighb.$',40,0.,1E5,0)           
+          CALL HBOOK1(47726,'PH, ch. with dead neighb.$',40,0.,1E5,0)           
+          CALL HBOOK1(47780,'Peds, Si1$',40,0.,200.,0)                          
+          CALL HBOOK1(47781,'Peds, Si2$',40,0.,200.,0)                          
+          CALL HBOOK1(47782,'Peds, Si3$',40,0.,200.,0)                          
+          CALL HBOOK1(47783,'Peds-offset, Si1$',40,-200.,200.,0)                
+          CALL HBOOK1(47784,'Peds-offset, Si2$',40,-200.,200.,0)                
+          CALL HBOOK1(47785,'Peds-offset, Si3$',40,-200.,200.,0)                
+          CALL HBOOK1(47993,'Mean Si3-Si1 x$',60,-0.5,59.5,0)                   
+CCCCCC    CALL HBOOK2(47994,'x vs burst pl1$',60,-0.5,59.5,25,0.05,0.30,        
+C         CALL HBOOK2(47995,'x vs burst pl2$',60,-0.5,59.5,25,0.05,0.30,        
+CCCCCC    CALL HBOOK2(47996,'x vs burst pl3$',60,-0.5,59.5,25,0.05,0.30,        
+          CALL HBOOK1(47997,'X of track in plane 1$',60,-0.70,+0.70,0)          
+          CALL HBOOK1(47998,'X of track in plane 2$',60,-0.70,+0.70,0)          
+          CALL HBOOK1(47999,'X of track in plane 3$',60,-0.70,+0.70,0)          
+          CALL HBSTAT(47997)                                                    
+          CALL HBSTAT(47998)                                                    
+          CALL HBSTAT(47999)                                                    
+C                                                                               
+          CALL HBOOK1(48101,'Xhit, Si1, run1$',60, 0.35, 0.41,0)                
+          CALL HBOOK1(48102,'Xhit, Si2, run1$',60, 0.35, 0.41,0)                
+          CALL HBOOK1(48103,'Xhit, Si3, run1$',60, 0.35, 0.41,0)                
+CSELF,IF=SIBEAM.                                                                
+C         CALL HBOOK1(48201,'Xhit, Si1, run2$',60, 0.35, 0.41,0)                
+C         CALL HBOOK1(48202,'Xhit, Si2, run2$',60, 0.35, 0.41,0)                
+C         CALL HBOOK1(48203,'Xhit, Si3, run2$',60, 0.35, 0.41,0)                
+C         CALL HBOOK1(48301,'Xhit, Si1, run3$',60, 0.35, 0.41,0)                
+C         CALL HBOOK1(48302,'Xhit, Si2, run3$',60, 0.35, 0.41,0)                
+C         CALL HBOOK1(48303,'Xhit, Si3, run3$',60, 0.35, 0.41,0)                
+C                                                                               
+C         CALL HBOOK1(48401,'Xhit, Si1, run4$',60,-0.04, 0.02,0)                
+C         CALL HBOOK1(48402,'Xhit, Si2, run4$',60,-0.04, 0.02,0)                
+C         CALL HBOOK1(48403,'Xhit, Si3, run4$',60,-0.17,-0.11,0)                
+C         CALL HBOOK1(48501,'Xhit, Si1, run5$',60,-0.04, 0.02,0)                
+C         CALL HBOOK1(48502,'Xhit, Si2, run5$',60,-0.04, 0.02,0)                
+C         CALL HBOOK1(48503,'Xhit, Si3, run5$',60, 0.07, 0.13,0)                
+C         CALL HBOOK1(48601,'Xhit, Si1, run6$',60,-0.04, 0.02,0)                
+C         CALL HBOOK1(48602,'Xhit, Si2, run6$',60,-0.04, 0.02,0)                
+C         CALL HBOOK1(48603,'Xhit, Si3, run6$',60, 0.07, 0.13,0)                
+C                                                                               
+C         CALL HBOOK1(48701,'Xhit, Si1, run7$',60,-0.44,-0.38,0)                
+C         CALL HBOOK1(48702,'Xhit, Si2, run7$',60,-0.44,-0.38,0)                
+C         CALL HBOOK1(48703,'Xhit, Si3, run7$',60,-0.44,-0.38,0)                
+C         CALL HBOOK1(48801,'Xhit, Si1, run8$',60,-0.44,-0.38,0)                
+C         CALL HBOOK1(48802,'Xhit, Si2, run8$',60,-0.44,-0.38,0)                
+C         CALL HBOOK1(48803,'Xhit, Si3, run8$',60,-0.44,-0.38,0)                
+C         CALL HBOOK1(48901,'Xhit, Si1, run9$',60,-0.44,-0.38,0)                
+C         CALL HBOOK1(48902,'Xhit, Si2, run9$',60,-0.44,-0.38,0)                
+C         CALL HBOOK1(48903,'Xhit, Si3, run9$',60,-0.44,-0.38,0)                
+CSELF.                                                                          
+        ENDIF                                                                   
+*                                                                               
+        IF ( FLAGSI(8) ) THEN                                                   
+          HNAME = 'PH, strip xxx, plane yyy $'                                  
+          DO 10 IPLANE = 1,3                                                    
+            WRITE(HNAME(22:24),100)IPLANE                                       
+            DO 20 ISTRIP = 1,400                                                
+              WRITE(HNAME(11:13),100)ISTRIP                                     
+ 100          FORMAT(I3)                                                        
+              CALL HBOOK1(IH0(IPLANE)+ISTRIP,HNAME,40,0.,640.,0)                
+  20        CONTINUE                                                            
+  10      CONTINUE                                                              
+        ENDIF                                                                   
+*                                                                               
+        IF ( FLAGSI(9) ) THEN                                                   
+          CALL HBOOK1(47901,' PHs, one event  # 1$',400,0.5,400.5,0)            
+          CALL HBOOK1(47902,' PHs, one event  # 2$',400,0.5,400.5,0)            
+          CALL HBOOK1(47903,' PHs, one event  # 3$',400,0.5,400.5,0)            
+          CALL HROTAT(47901)                                                    
+          CALL HROTAT(47902)                                                    
+          CALL HROTAT(47903)                                                    
+        ENDIF                                                                   
+        IF ( FLAGSI(10) ) THEN                                                  
+CCCCCCCCCCCALL HBOOK1(47001,'Y in Si-pad$',30,-2.,2.,0)                         
+C         CALL HBOOK1(47002,'# pads for a track$',31,-0.5,61.5,0)               
+C         CALL HBOOK1(47003,'# padhits for a track$',20,-0.5,19.5,0)            
+C         CALL HBOOK2(47007,'Residue vs. Y, p1$',40,-0.20,0.20,                 
+C    *               30,-2.,2.,0)                                               
+C         CALL HBOOK2(47008,'Residue vs. Y, p2$',40,-0.01,0.01,                 
+C    *               30,-2.,2.,0)                                               
+C         CALL HBOOK2(47009,'Residue vs. Y, p3$',40,-0.20,0.20,                 
+CCCCC*CCCCCC         30,-2.,2.,0)                                               
+C         CALL HBOOK1(47010,'DCsegment - Sitrak$',40,-8.,8.,0)                  
+C         CALL HBOOK1(47011,'DCsegm - Sitrak, mod 1$',40,-2.,2.,0)              
+C         CALL HBOOK1(47012,'DCsegm - Sitrak, mod 5$',40,-2.,2.,0)              
+C         CALL HBOOK1(47013,'DCsegm - Sitrak, mod 1, -$',40,-2.,2.,0)           
+C         CALL HBOOK1(47014,'DCsegm - Sitrak, mod 5, -$',40,-2.,2.,0)           
+C         IF ( .NOT. OLDHB ) THEN                                               
+C           CALL HBPROF(47015,'DC-Si vs x, m1$'                                 
+C    *                            ,40,-10.,10.,-0.2,0.2,' ')                    
+C           CALL HBPROF(47016,'DC-Si vs x, m5$'                                 
+C    *                            ,40,-10.,10.,-0.2,0.2,' ')                    
+C         ENDIF                                                                 
+C         CALL HBOOK1(47017,'DCsegm - Sitrak, mod 1$',40,-0.4,0.4,0)            
+C         CALL HBOOK1(47018,'DCsegm - Sitrak, mod 5$',40,-0.4,0.4,0)            
+C         CALL HBOOK1(47019,'DC-Si slope mod 1$',40,-0.04,0.04,0)               
+C         CALL HBOOK1(47020,'DC-Si slope mod 5$',40,-0.04,0.04,0)               
+C         CALL HBOOK1(47021,'DCSi mod 1, match in 5$',40,-0.4,0.4,0)            
+C         CALL HBOOK1(47022,'DCSi mod 5, match in 1$',40,-0.4,0.4,0)            
+C         CALL HBOOK1(47023,'Best DCSi, mod 1$',40,-0.4,0.4,0)                  
+C         CALL HBOOK1(47024,'Best DCSi, mod 5$',40,-0.4,0.4,0)                  
+C         CALL HBOOK2(47025,'DCSi 1 vs 5$',20,-0.4,0.4,20,-0.4,0.4,0)           
+C         CALL HBOOK1(47026,'# segments DC1$',6,0.5,6.5,0)                      
+C         CALL HBOOK1(47029,'DCsegm - Sitrak, mod 3$',40,-2.,2.,0)              
+C         CALL HBOOK1(47030,'DCsegm - Sitrak, mod 4$',40,-2.,2.,0)              
+C         CALL HBOOK1(47031,'DCsegm - Sitrak, mod 3, -$',40,-2.,2.,0)           
+C         CALL HBOOK1(47032,'DCsegm - Sitrak, mod 4, -$',40,-2.,2.,0)           
+C         IF ( .NOT. OLDHB ) THEN                                               
+C           CALL HBPROF(47033,'DC-Si vs x, m3$'                                 
+C    *                             ,40,-10.,10.,-0.2,0.2,' ')                   
+C           CALL HBPROF(47034,'DC-Si vs x, m4$'                                 
+C    *                             ,40,-10.,10.,-0.2,0.2,' ')                   
+C         ENDIF                                                                 
+C         CALL HBOOK1(47035,'DCsegm - Sitrak, mod 3$',40,-0.4,0.4,0)            
+C         CALL HBOOK1(47036,'DCsegm - Sitrak, mod 4$',40,-0.4,0.4,0)            
+C         CALL HBOOK1(47037,'DC-Si slope mod 3$',40,-0.04,0.04,0)               
+CCCCCCCCCCCALL HBOOK1(47038,'DC-Si slope mod 4$',40,-0.04,0.04,0)               
+          CALL HBOOK1(47027,'DC track vs Si, X$',40,-0.4,0.4,0)                 
+          CALL HBOOK1(47028,'DC track vs Si, slope$',40,-0.02,0.02,0)           
+          IF ( DEBHIS ) THEN                                                    
+            CALL HBOOK1(47039,'DC-track at z=1cm$',40,-1.,1.,0)                 
+            CALL HBOOK1(47040,'DC-track slope$',40,-0.04,0.04,0)                
+            CALL HBOOK1(47041,'DC-track icept$',40,-0.4,0.4,0)                  
+          ENDIF                                                                 
+          CALL HBOOK1(47042,'Best DC-Si slope$',40,-0.02,0.02,0)                
+          CALL HBOOK1(47043,'dx, best slope$',40,-0.4,0.4,0)                    
+          IF ( DEBHIS ) THEN                                                    
+            CALL HBOOK2(47044,'dx vs dslope$',20,-1.,1.,20,-0.1,0.1,0)          
+            CALL HBOOK1(47045,'Chi2, used Si-trak$',40,0.,10.,0)                
+            CALL HBOOK1(47046,'Chi2, unused Si-trak$',40,0.,10.,0)              
+            CALL HBOOK1(47047,'DC z vertex$',40,-4.,4.,0)                       
+            CALL HBOOK1(47049,'# dc tracks$',20,-0.5,19.5,0)                    
+            CALL HBOOK1(47050,'y of matched track$',40,-10.,10.,0)              
+            IF ( .NOT. OLDHB ) THEN                                             
+              CALL HBPROF(47048,'dx(x), DC-Si$',40,-10.,10.                     
+     *                                                  ,-0.2,0.2,' ')          
+              CALL HBPROF(47051,'dx(y), DC-Si$',40,-10.,10.                     
+     *                                                  ,-0.2,0.2,' ')          
+              CALL HBPROF(47052,'Si residu(y)$',40,-10.,10.                     
+     *                                                ,-0.01,0.01,' ')          
+            ENDIF                                                               
+          ENDIF                                                                 
+          CALL HBOOK1(47053,'DCtrack - Si1 hit$',40,-0.2,0.2,0)                 
+          CALL HBOOK1(47054,'DCtrack - Si2 hit$',40,-0.2,0.2,0)                 
+          CALL HBOOK1(47055,'DCtrack - Si3 hit$',40,-0.2,0.2,0)                 
+          CALL HBOOK1(47056,'# Si hits on DC track$',4,-0.5,3.5,0)              
+          IF ( DEBHIS ) THEN                                                    
+           CALL HBOOK1(47057,'# Si h. on DC tr. w/ Si-tr$',4,-0.5,3.5,0)        
+           CALL HBOOK1(47058,'# Si h. on DC tr. wo Si-tr$',4,-0.5,3.5,0)        
+           CALL HBOOK1(47059,'Residu Sihits in DCtr without Sitr$'              
+     *                    ,40,-0.04,0.04,0)                                     
+           CALL HBOOK1(47060,'#str Sihit on DCtr wo SItr$',9,-0.5,8.5,0)        
+           CALL HBOOK1(47061,'#used hits on DCtr wo Sitr$',4,-0.5,3.5,0)        
+           CALL HBOOK1(47062,'#unused hits, DCtr wo Sitr$',4,-0.5,3.5,0)        
+          ENDIF                                                                 
+          CALL HBOOK1(47063,'Sitr-DCtr z=15. cm$',40,-0.2,0.2,0)                
+        ENDIF                                                                   
++SELF.                                                                          
+*                                                                               
+      IF ( NLIPOL ) THEN                                                        
+CCCCCCC CALL VMCMS('FILEDEF 65 DISK SIETA INTEGRAL *',IERR)                     
+C       IF ( IERR .NE. 0 ) THEN                                                 
+C         WRITE(6,*)'ERROR READING ETA INTEGRAL'                                
+C         NLIPOL = .FALSE.                                                      
+C       ELSE                                                                    
+C         DO 30 I=1,3                                                           
+C           HIETA(0,I) = 0.                                                     
+C           HIOUT(0,I) = 0.                                                     
+C           DO 40 J = 1,40                                                      
+C             READ(65,243)HIETA(J,I),HIOUT(J,I)                                 
+C243          FORMAT(1X,2F10.5)                                                 
+C 40        CONTINUE                                                            
+C 30      CONTINUE                                                              
+CCCCCCCCENDIF                                                                   
+C       (** Read from database : **)                                            
+        NMAX = 486                                                              
+        CALL DBCALG('SIL1','ETA ',HIETA,NMAX,NACT,IERR)                         
+        IF ( IERR .NE. 0 ) THEN                                                 
+          WRITE(6,*)'From DBCALG(ETA) error ',IERR                              
+          NLIPOL = .FALSE.                                                      
+        ELSE                                                                    
+          WRITE(6,*)'Eta-tables read from database, ',NACT,' words.'            
+        ENDIF                                                                   
+      ENDIF                                                                     
+*                                                                               
+      CALL VZERO(PH,2400*3)                                                     
+*                                                                               
+       RETURN                                                                   
+       END                                                                      
++DECK,SITRAK.                                                                   
+C                                                                               
+      SUBROUTINE SITRAK(IPL1,IPL2,IPLX)                                         
+*                                                                               
+*----------------------------------------------------------                     
+*    Reconstructs tracks in x-z,                                                
+*    using hits in the three Si-strip detectors.                                
+*    Take all combinations of hits in planes IPL1 and IPL2,                     
+*    and see if they point at a hit in plane IPLX.                              
+*----------------------------------------------------------                     
+*    Produces Sandra label 4447 :                                               
+*                                                                               
+*    Word 1 : # of tracks                                                       
+*      then 10 words per track                                                  
+*    word 10*ITRACK-8 : Slope (dx/dz)                                           
+*                  -7 : Offset (x at z=0)                                       
+*                  -6 : Sigma(Slope)                                            
+*                  -5 : Sigma(Offset)                                           
+*                  -4 : Chi2                                                    
+*                  -3 : Hit in plane 1 associated with this track               
+*                  -2 : Hit in plane 2 associated with this track               
+*                  -1 : Hit in plane 3 associated with this track               
+*                   0 : Vertex this track comes from                            
+*                        -1 : Primary vertex                                    
+*                         0 : No vertex identified                              
+*                        +n : Secondary vertex # n (see label 4547)             
+*                  +1 : DC track associated                                     
+*----------------------------------------------------------                     
+*                                                                               
++CDE,SIHITR.                                                                    
++CDE,SICTRK.                                                                    
++CDE,SIMDAT.                                                                    
++CDE,SIPEDS.                                                                    
++CDE,SIALSM.                                                                    
++CDE,SIFLAG.                                                                    
++CDE,SICOM.                                                                     
++CDE,SIALIGN.                                                                   
+*                                                                               
+      LOGICAL ACCEPT                                                            
+      INTEGER ITHIT(3)                                                          
+      DIMENSION BUF(10*MXTRK + 1),IBUF(10*MXTRK+1)                              
+      EQUIVALENCE (BUF,IBUF)                                                    
+C                                                                               
++SELF,IF=SIBEAM.                                                                
+C     (*  For beam tape; take only events with 1 hit in each plane *)           
+      IF ( NHITS(1) .NE. 1 ) THEN                                               
+        RETURN                                                                  
+      ENDIF                                                                     
+      IF ( NHITS(2) .NE. 1 ) THEN                                               
+        RETURN                                                                  
+      ENDIF                                                                     
+      IF ( NHITS(3) .NE. 1 ) THEN                                               
+        RETURN                                                                  
+      ENDIF                                                                     
++SELF.                                                                          
+      IF ( NHITS(1) .LT. 1 ) THEN                                               
+        RETURN                                                                  
+      ENDIF                                                                     
+      IF ( NHITS(2) .LT. 1 ) THEN                                               
+        RETURN                                                                  
+      ENDIF                                                                     
+      IF ( NHITS(3) .LT. 1 ) THEN                                               
+        RETURN                                                                  
+      ENDIF                                                                     
+C                                                                               
+       DO 4 IP=1,3                                                              
+           DO 5 I=1,MAXHIT                                                      
+                ITUSED(I,IP) = 0                                                
+                NTRUSE(I,IP) = 0                                                
+5          CONTINUE                                                             
+4      CONTINUE                                                                 
+*                                                                               
+******MXH = MAX(NHITS(1),NHITS(2),NHITS(3))                                     
+*     DO 96 I = 1,3                                                             
+*       DO 97 J = NHITS(I)+1,MXH                                                
+*         XHIT(J,I) = 1E30                                                      
+*97     CONTINUE                                                                
+*96   CONTINUE                                                                  
+CCCCCCWRITE(6,*)'======= HITS : ==============================='                
+C     DO 7 I = 1,MXH                                                            
+C       WRITE(6,543)(XHIT(I,JJ),JJ=1,3)                                         
+C543    FORMAT(1X,3F9.4)                                                        
+C7CCCCCONTINUE                                                                  
+*                                                                               
+      NTRKSI = 0                                                                
+      NTRKS0 = 0                                                                
+*                                                                               
+CCCCC IF ( NHITS(IPLX) .GT. 0 ) THEN                                            
+*       (* Sort the hits in IPLX, to binary search later : *)                   
+C       CALL FLPSOR(XHIT(1,IPLX),NHITS(IPLX))                                   
+CCCCC ENDIF                                                                     
+*                                                                               
+      Z1 = SILPOS(IPL1)                                                         
+      Z2 = SILPOS(IPL2)                                                         
+      NTDEAD = 0                                                                
+*                                                                               
+      DO 10 I1 = 1,NHITS(IPL1)                                                  
+        I2BEST = 0                                                              
+        I2DEAD = 0                                                              
+        RBEST = 99999.                                                          
+        X1 = XHIT(I1,IPL1)                                                      
+        I1STRP = IFSTRP(I1,IPL1)                                                
+        DO 20 I2 = 1,NHITS(IPL2)                                                
+          IF ( ABS(IFSTRP(I2,IPL2)-I1STRP) .LE. 50 ) THEN                       
+            X2 = XHIT(I2,IPL2)                                                  
+            SL12 = (X2-X1)/(Z2-Z1)                                              
+            XX = X1 + SL12*(SILPOS(IPLX)-Z1)                                    
+            CALL SIPLX(IPLX,XX,IBEST,I1STRP,RESIDU,ACCEPT)                      
+            IF ( ACCEPT ) THEN                                                  
+              IF ( ABS(RESIDU) .LT. RBEST ) THEN                                
+                RBEST = ABS(RESIDU)                                             
+                SRBEST = RESIDU                                                 
+                I2BEST = I2                                                     
+                IXBEST = IBEST                                                  
+              ENDIF                                                             
+            ELSE                                                                
+              ISIPOL = (IFSTRP(I2,IPL2)+I1STRP)/2                               
+              IF ( LDEAD(ISIPOL,IPLX) ) THEN                                    
+                I2DEAD = I2                                                     
+              ENDIF                                                             
+            ENDIF                                                               
+          ENDIF                                                                 
+ 20     CONTINUE                                                                
+        IF ( I2BEST .GT. 0 ) THEN                                               
+          IF ( LNDEAD(IFSTRP(I2BEST,IPL2),IPL2) ) THEN                          
+            I2BEST = 0                                                          
+          ENDIF                                                                 
+          IF ( LNDEAD(IFSTRP(IXBEST,IPLX),IPLX) ) THEN                          
+            I2BEST = 0                                                          
+          ENDIF                                                                 
+          IF ( LNDEAD(IFSTRP(I1,IPL1),IPL1) ) THEN                              
+            I2BEST = 0                                                          
+          ENDIF                                                                 
+          IF ( I2BEST .EQ. 0 ) THEN                                             
+            CALL HFILL(47737,SRBEST,0.,1.)                                      
+          ENDIF                                                                 
+        ENDIF                                                                   
+        IF ( I2BEST .GT. 0 ) THEN                                               
+          IF ( NTRKSI .GE. MXTRK ) THEN                                         
+            IF ( PRNTSI ) THEN                                                  
+              IF ( JPRTSI .LT. NPRTSI ) THEN                                    
+                WRITE(6,*)'SITRAK; Max # tracks exceeded !'                     
+                JPRTSI = JPRTSI + 1                                             
+              ELSEIF ( JPRTSI .EQ. NPRTSI ) THEN                                
+                WRITE(6,*)'SISTRIP; No more error messages printed !'           
+              ENDIF                                                             
+            ENDIF                                                               
+            GOTO 98                                                             
+          ENDIF                                                                 
+          NTRKSI = NTRKSI + 1                                                   
+          ITRAK = NTRKSI                                                        
+          ITHIT(IPL1) = I1                                                      
+          ITHIT(IPL2) = I2BEST                                                  
+          ITHIT(IPLX) = IXBEST                                                  
+          CALL SILSQ(ITHIT,XSLOPE,CEPT,DSL,DCEPT,CHI2)                          
+          IF ( FLAGSI(7) ) THEN                                                 
+            CALL HFILL(47997,XHIT(I1    ,IPL1),0.,1.)                           
+            CALL HFILL(47998,XHIT(IXBEST,IPLX),0.,1.)                           
+            CALL HFILL(47999,XHIT(I2BEST,IPL2),0.,1.)                           
+            CALL HFILL(48001+100*IIRUN,XHIT(I1    ,IPL1),0.,1.)                 
+            CALL HFILL(48002+100*IIRUN,XHIT(IXBEST,IPLX),0.,1.)                 
+            CALL HFILL(48003+100*IIRUN,XHIT(I2BEST,IPL2),0.,1.)                 
+          ENDIF                                                                 
+          DO 40 JJ = 1,3                                                        
+           IF ( CHI2 .GT. CHITRC ) THEN                                         
+C            (* Skip tracks with Chi-2 worse than CHITRC *)                     
+             NTRKSI = NTRKSI - 1                                                
+             GOTO 10                                                            
+           ENDIF                                                                
+           IF ( .NOT. REUSE ) THEN                                              
+            IF ((ITUSED(ITHIT(JJ),JJ) .GT. 0)                                   
+     *      .AND.(NFIRH(ITHIT(JJ),JJ) .LE. 3) ) THEN                            
+              JTRAK = ITUSED(ITHIT(JJ),JJ)                                      
+*             (** If hit already used, and competing track **)                  
+*             (** has better Chi2, skip this one.          **)                  
+              IF ( CHISQ(JTRAK) .LT. CHI2 ) THEN                                
+                NTRKSI = NTRKSI - 1                                             
+                GOTO 10                                                         
+              ELSE                                                              
+*               (** Overwrite the previous track **)                            
+                DO 65 KK = 1,3                                                  
+                  IF ( LTHIT(KK,JTRAK) .GT. 0 ) THEN                            
+                    ITUSED(LTHIT(KK,JTRAK),KK) = 0                              
+                  ENDIF                                                         
+ 65             CONTINUE                                                        
+                NTRKSI = NTRKSI-1                                               
+                ITRAK = JTRAK                                                   
+              ENDIF                                                             
+            ENDIF                                                               
+           ENDIF                                                                
+           NTRUSE(ITHIT(JJ),JJ) = NTRUSE(ITHIT(JJ),JJ) + 1                      
+ 40       CONTINUE                                                              
+          DO 45 JJ=1,3                                                          
+            LTHIT(JJ,ITRAK) = ITHIT(JJ)                                         
+            DX = XHIT(ITHIT(JJ),JJ)-XSLOPE*SILPOS(JJ)-CEPT                      
+            CALL HFILL(400+JJ,FLOAT(IFSTRP(ITHIT(JJ),JJ)),DX,1.)                
+            IF ( FLAGSI(7) ) THEN                                               
+C             *CALL HFILL(47314+JJ,DX,0.,1.)                                    
+              CALL HFILL(47323+JJ,DX/SIGMA(ITHIT(JJ),JJ),0.,1.)                 
+              CALL HFILL(47317+JJ,ETAHIT(ITHIT(JJ),JJ),DX,1.)                   
+            ENDIF                                                               
+ 45       CONTINUE                                                              
+          ITUSED(I1,IPL1) = ITRAK                                               
+          ITUSED(I2BEST,IPL2) = ITRAK                                           
+          ITUSED(IXBEST,IPLX) = ITRAK                                           
+          OFSET(ITRAK) = CEPT                                                   
+          SLOPE(ITRAK) = XSLOPE                                                 
+          DOFSET(ITRAK)= DCEPT                                                  
+          DSLOPE(ITRAK)= DSL                                                    
+          CHISQ(ITRAK) = CHI2                                                   
+CCCCCC    WRITE(6,732)ITRAK,(ITHIT(JJ),JJ=1,3),XSLOPE,CEPT                      
+C732CCC   FORMAT(1X,'Tr ',I2,'; hits ',3I3,2F10.4)                              
+          RES(ITRAK) = SRBEST                                                   
+          IF ( XSLOPE .NE. 0 ) THEN                                             
+            ZBEST = SRBEST/XSLOPE                                               
+            CALL HFILL(47314,ZBEST,0.,1.)                                       
+          ENDIF                                                                 
+          CALL HFILL(47300+IPLX,SRBEST,0.,1.)                                   
+          IF ( ABS(STRDX(IFSTRP(IXBEST,IPLX),IPLX)) .LT. 0.0005 ) THEN          
+            CALL HFILL(132,SRBEST,0.,1.)                                        
+          ENDIF                                                                 
+          IF ( FLAGSI(7) ) THEN                                                 
+            CALL HFILL(47703+IPLX,SRBEST,XHIT(IXBEST,IPLX),1.)                  
+            IF ( ABS(CEPT) .LE. 0.2 ) THEN                                      
+              CALL HFILL(47329,SRBEST,0.,1.)                                    
+            ELSE                                                                
+              CALL HFILL(47330,SRBEST,0.,1.)                                    
+            ENDIF                                                               
+          ENDIF                                                                 
+CCCCC     JJ = NINT((IFSTRP(IXBEST,IPLX)+50)*0.01)                              
+C         XX = XHIT(IXBEST,IPLX)                                                
+C         SX(JJ) = SX(JJ) + XX                                                  
+C         SR(JJ) = SR(JJ) + SRBEST                                              
+C         SRX(JJ) = SRX(JJ) + SRBEST*XX                                         
+C         XX = XX*XX                                                            
+C         SX2(JJ) = SX2(JJ) + XX                                                
+C         SRX2(JJ) = SRX2(JJ) + SRBEST*XX                                       
+C         XX = XX*XHIT(IXBEST,IPLX)                                             
+C         SX3(JJ) = SX3(JJ) + XX                                                
+C         XX = XX*XHIT(IXBEST,IPLX)                                             
+C         SX4(JJ) = SX4(JJ) + XX                                                
+CCCCCCCCC NSS(JJ) = NSS(JJ) + 1                                                 
+          IF ( FLAGSI(7) ) THEN                                                 
+            IF ( ABS(XHIT(IXBEST,IPLX)) .LT. 0.5 ) THEN                         
+              CALL HFILL(47708,SRBEST,0.,1.)                                    
+            ELSEIF ( XHIT(IXBEST,IPLX) .LT. -0.5 ) THEN                         
+              CALL HFILL(47707,SRBEST,0.,1.)                                    
+            ELSE                                                                
+              CALL HFILL(47709,SRBEST,0.,1.)                                    
+            ENDIF                                                               
+            JJ = IFSTRP(IXBEST,IPLX)                                            
+            CALL HFILL(47427,FLOAT(JJ),SRBEST,1.)                               
+            NSTRK(JJ) = NSTRK(JJ) + 1                                           
+            RSTRK(JJ) = RSTRK(JJ) + SRBEST                                      
+            CALL HFILL(47736,FLOAT(JJ),0.,1.)                                   
+            IF ( JJ .LE. 100 ) THEN                                             
+              CALL HFILL(47730,SRBEST,0.,1.)                                    
+            ELSEIF ( JJ .LE. 150 ) THEN                                         
+              CALL HFILL(47731,SRBEST,0.,1.)                                    
+            ELSEIF ( JJ .LE. 200 ) THEN                                         
+              CALL HFILL(47732,SRBEST,0.,1.)                                    
+            ELSEIF ( JJ .LE. 250 ) THEN                                         
+              CALL HFILL(47733,SRBEST,0.,1.)                                    
+            ELSEIF ( JJ .LE. 300 ) THEN                                         
+              CALL HFILL(47734,SRBEST,0.,1.)                                    
+            ELSE                                                                
+              CALL HFILL(47735,SRBEST,0.,1.)                                    
+            ENDIF                                                               
+            JJ = NINT(JJ*0.1+0.45)                                              
+            CALL HFILL(47739+JJ,SRBEST,0.,1.)                                   
+          ENDIF                                                                 
+          CALL HFILL(47305,XSLOPE,0.,1.)                                        
+          CALL HFILL(47306,CEPT,0.,1.)                                          
+          CALL HFILL(47309,XSLOPE,CEPT,1.)                                      
+          CALL HFILL(47307,CHI2,0.,1.)                                          
+          CALL HFILL(47313,CHI2,CEPT,1.)                                        
+          CALL HFILL(47327,SRBEST,CHI2,1.)                                      
+          CALL HFILL(47328,SRBEST,CEPT,1.)                                      
+          CALL HFILL(47333,DSL,0.,1.)                                           
+          CALL HFILL(47334,DCEPT,0.,1.)                                         
+        ELSE                                                                    
+          NTDEAD = NTDEAD+1                                                     
+        ENDIF                                                                   
+ 10   CONTINUE                                                                  
+C                                                                               
+ 98   CONTINUE                                                                  
+*                                                                               
+      CALL HFILL(47304,FLOAT(NTRKSI),0.,1.)                                     
+C     *CALL HFILL(47311,FLOAT(NTDEAD),0.,1.)                                    
+C     *CALL HFILL(47312,FLOAT(NTDEAD+NTRKSI),0.,1.)                             
+      NHTOT = NHITS(1)+NHITS(2)+NHITS(3)                                        
+      CALL HFILL(47308,FLOAT(NTRKSI),FLOAT(NHTOT),1.)                           
+*                                                                               
+      IBUF(1) = NTRKSI                                                          
+      DO 88 ITRAK = 1,NTRKSI                                                    
+        BUF(10*ITRAK-8) = SLOPE(ITRAK)                                          
+        BUF(10*ITRAK-7) = OFSET(ITRAK)                                          
+        BUF(10*ITRAK-6) = 0.                                                    
+        BUF(10*ITRAK-5) = 0.                                                    
+        BUF(10*ITRAK-4) = CHISQ(ITRAK)                                          
+        DO 86 JJ=1,3                                                            
+          IBUF(10*ITRAK-4+JJ) = LTHIT(JJ,ITRAK)                                 
+ 86     CONTINUE                                                                
+        IBUF(10*ITRAK) = 0                                                      
+        IBUF(10*ITRAK+1) = 0                                                    
+ 88   CONTINUE                                                                  
+*                                                                               
+      LENGTH = 10*NTRKSI+1                                                      
+      CALL LBSTOR(4447,BUF,LENGTH,-1,1)                                         
+*                                                                               
+      IF ( ANHIST ) THEN                                                        
+        DO 70 IPL=1,3                                                           
+          DO 75 IHIT = 1,NHITS(IPL)                                             
+            IF ( ITUSED(IHIT,IPL) .GT. 0 ) THEN                                 
+              CALL HFILL(47253+IPL,FLOAT(LPHHIT(IHIT,IPL)),0.,1.)               
+              CALL HFILL(47259+IPL,FLOAT(NFIRH(IHIT,IPL)),0.,1.)                
+CCC           IF ( FLAGSI(7) ) THEN                                             
+                CALL HFILL(47250+IPL,ETAHIT(IHIT,IPL)                           
+     *                    ,FLOAT(LPHHIT(IHIT,IPL)),1.)                          
+                CALL HFILL(47262+IPL,ETAHIT(IHIT,IPL),0.,1.)                    
+CCC           ENDIF                                                             
+            ELSE                                                                
+              CALL HFILL(47256+IPL,FLOAT(LPHHIT(IHIT,IPL)),0.,1.)               
+            ENDIF                                                               
+ 75       CONTINUE                                                              
+ 70     CONTINUE                                                                
+      ENDIF                                                                     
+C                                                                               
+      IF ( ANHIST ) THEN                                                        
+C       (*** Plot min. distance between tracks ***)                             
+        DO 93 I=1,NTRKSI-1                                                      
+          DO 94 J = I+1,NTRKSI                                                  
+            IF ( ABS(LTHIT(1,J)-LTHIT(1,I)) .LT. 50 ) THEN                      
+              DSL = ABS(SLOPE(I)-SLOPE(J))                                      
+              XI  = SLOPE(I)*15. + OFSET(I)                                     
+              XJ  = SLOPE(J)*15. + OFSET(J)                                     
+              CALL HFILL(47331,DSL,0.,1.)                                       
+              CALL HFILL(47332,ABS(XI-XJ),0.,1.)                                
+            ENDIF                                                               
+ 94       CONTINUE                                                              
+ 93     CONTINUE                                                                
+      ENDIF                                                                     
+*                                                                               
+      NTRKS0 = NTRKSI                                                           
+*                                                                               
+      RETURN                                                                    
+      END                                                                       
++DECK,SICLUX.                                                                   
+C                                                                               
+      SUBROUTINE SICLUX(NP,LPH,IFIRST,IBIG,NX,XHIT,IPEAK,LPHTOT                 
+     *                 ,ERRX,ETAH)                                              
+C                                                                               
+C***********************************************************                    
+C                                                                               
++CDE,SICOM.                                                                     
++CDE,SIMDAT.                                                                    
++CDE,SIALIGN.                                                                   
++CDE,SIADCS.                                                                    
+*                                                                               
+      DIMENSION LPH(*),XHIT(*),ERRX(*),LPHTOT(*),ETAH(*)                        
+      LOGICAL LMIN                                                              
+      PARAMETER ( NXMAX = 20 )                                                  
+      DIMENSION IPEAK(NXMAX)                                                    
+*                                                                               
+      IPMIN =   200                                                             
+      IDIFMN =  140                                                             
+*                                                                               
+      PITCH = LRDPIT(ISIDET)*SILPIT(ISIDET)                                     
+      IF ( IFIRST .LE. 200 ) THEN                                               
+        ISTRIP = IFIRST                                                         
+      ELSE                                                                      
+        ISTRIP = IFIRST - 100                                                   
+      ENDIF                                                                     
+                                                                                
+C+SELF,IF=MCARLOSI.  TEMPORARY fix, until I've fixed the MC                     
+      IF ( MCSI ) THEN                                                          
+        XSTRIP = SILDIS(ISIDET) + ISTRIP*PITCH                                  
+      ELSE                                                                      
+C+SELF,IF=-MCARLOSI.                                                            
+        IF ( ISTRIP .LE. 100 ) THEN                                             
+          XSTRIP = SILDIS(ISIDET) + 0.00125 + (ISTRIP-1.)*PITCH                 
+        ELSEIF ( ISTRIP .LE. 200 ) THEN                                         
+          XSTRIP = SILDIS(ISIDET) + 0.00375 + (ISTRIP-2.)*PITCH                 
+        ELSE                                                                    
+          XSTRIP = SILDIS(ISIDET) + 0.00625 + (ISTRIP-3.)*PITCH                 
+        ENDIF                                                                   
+      ENDIF                                                                     
+C+SELF.                                                                         
+      IF ( SDEBUG ) THEN                                                        
+        WRITE(6,*)'ISIDET,ISTRIP,XSTRIP : ',ISIDET,ISTRIP,XSTRIP                
+      ENDIF                                                                     
+      IF ( NP .EQ. 1 ) THEN                                                     
+        NX = 1                                                                  
+        XHIT(1) = XSTRIP                                                        
+        ERRX(1) = 0.2886751*PITCH + 0.0010                                      
+        IPEAK(1) = IFIRST                                                       
+        LPHTOT(1) = LPH(1)                                                      
+        ETAH(1) = -1.0                                                          
+      ELSEIF ( NP .EQ. 2 ) THEN                                                 
+        CALL SIIPOL(LPH(1),LPH(2),ETA)                                          
+        NX = 1                                                                  
+        ETAH(1) = ETA                                                           
+        IF ( MOD(ISTRIP,100) .EQ. 0 ) THEN                                      
+          XHIT(1) = XSTRIP + ETA*SILPIT(ISIDET)                                 
+        ELSE                                                                    
+          XHIT(1) = XSTRIP + ETA*PITCH                                          
+        ENDIF                                                                   
+        ERRX(1) = 15.E-4                                                        
+        IF ( LPH(1) .GT. LPH(2) ) THEN                                          
+          IPEAK(1) = IFIRST                                                     
+        ELSE                                                                    
+          IPEAK(1) = IFIRST+1                                                   
+        ENDIF                                                                   
+        LPHTOT(1) = LPH(1)+LPH(2)                                               
+      ELSEIF ( NP .GE. 3 ) THEN                                                 
+       IF (( NP .EQ. 3 ) .AND. ( IBIG .EQ. IFIRST+1 )) THEN                     
+         NX = 1                                                                 
+         IPEAK(1) = 2                                                           
+C        *LPHTOT(1) = LPH(1)+LPH(2)+LPH(3)                                      
+CCCCC    IF ( LPH(3) .GT. LPH(1) ) THEN                                         
+C          LPH(3) = LPH(3)-LPH(1)                                               
+C          LPH(1) = 0                                                           
+C        ELSE                                                                   
+C          LPH(1) = LPH(1)-LPH(3)                                               
+C          LPH(3) = 0                                                           
+CCCCC    ENDIF                                                                  
+       ELSE                                                                     
+         NX = 1                                                                 
+         IPEAK(1) = -1                                                          
+         LMIN = .FALSE.                                                         
+         LBIG = IPMIN                                                           
+         SMALL = 99999.                                                         
+         DO 10 I = 1,NP                                                         
+           IF ( LPH(I) .GT. LBIG ) THEN                                         
+             IF ( LPH(I) .GT. IPMIN ) THEN                                      
+               LBIG = LPH(I)                                                    
+               IF ( LMIN .AND.(NX .LT. NXMAX )) THEN                            
+                 NX = NX+1                                                      
+                 LMIN = .FALSE.                                                 
+               ENDIF                                                            
+               IPEAK(NX) = I                                                    
+             ENDIF                                                              
+           ELSE                                                                 
+             IF (( LBIG - LPH(I)  .GT.  IDIFMN )                                
+     *                   .AND.(IPEAK(1).GT.0)) THEN                             
+               LMIN = .TRUE.                                                    
+               LBIG = IPMIN                                                     
+             ENDIF                                                              
+           ENDIF                                                                
+ 10      CONTINUE                                                               
+         IF ( IPEAK(1) .EQ. -1 ) THEN                                           
+           IPEAK(1) = IBIG-IFIRST+1                                             
+         ENDIF                                                                  
+        ENDIF                                                                   
+*                                                                               
+        IF ( FLAGSI(7) ) THEN                                                   
+          CALL HFILL(47229,FLOAT(NX),0.,1.)                                     
+          CALL HFILL(47231,FLOAT(NX),FLOAT(NP),1.)                              
+        ENDIF                                                                   
+*                                                                               
+        DO 20 I = 1,NX                                                          
+         IF (( IPEAK(I) .GE. 1).AND.(IPEAK(I).LE.NP)) THEN                      
+          IF ( IPEAK(I) .EQ. 1 ) THEN                                           
+            I1 = 1                                                              
+            I2 = 2                                                              
+          ELSEIF ( IPEAK(I) .EQ. NP ) THEN                                      
+            I1 = IPEAK(I) - 1                                                   
+            I2 = IPEAK(I)                                                       
+          ELSEIF ( LPH(IPEAK(I)-1) .GT. LPH(IPEAK(I)+1)) THEN                   
+            I1 = IPEAK(I) - 1                                                   
+            I2 = IPEAK(I)                                                       
+            LPH(I2) = LPH(I2) - LPH(IPEAK(I)+1)                                 
+          ELSE                                                                  
+            I1 = IPEAK(I)                                                       
+            I2 = IPEAK(I) + 1                                                   
+            LPH(I2) = LPH(I2) - LPH(IPEAK(I)-1)                                 
+          ENDIF                                                                 
+          LPHTOT(I) = LPH(I1)+LPH(I2)                                           
+          CALL SIIPOL(LPH(I1),LPH(I2),ETA)                                      
+          JSTRIP = ISTRIP + I1 - 1                                              
+          IF ( JSTRIP .LE. 100 ) THEN                                           
+            XSTRIP = SILDIS(ISIDET) + 0.00125 + (JSTRIP-1.)*PITCH               
+          ELSEIF ( JSTRIP .LE. 200 ) THEN                                       
+            XSTRIP = SILDIS(ISIDET) + 0.00375 + (JSTRIP-2.)*PITCH               
+          ELSE                                                                  
+            XSTRIP = SILDIS(ISIDET) + 0.00625 + (JSTRIP-3.)*PITCH               
+          ENDIF                                                                 
+          IF ( MOD(JSTRIP,100) .EQ. 0 ) THEN                                    
+            XHIT(I) = XSTRIP + ETA*SILPIT(ISIDET)                               
+          ELSE                                                                  
+            XHIT(I) = XSTRIP + ETA*PITCH                                        
+          ENDIF                                                                 
+          ETAH(I) = ETA                                                         
+          IF ( IPEAK(I) .LE. 0 ) THEN                                           
+            WRITE(6,*)'IPEAK,I =',IPEAK(I),I                                    
+          ENDIF                                                                 
+          IPEAK(I) = IPEAK(I) + IFIRST - 1                                      
+          IF (( IPEAK(I) .LE. 0 ) .OR. ( IPEAK(I) .GT. 400 ) ) THEN             
+            WRITE(6,*)'ERROR in SICLUX; IPEAK(',I,') = ',IPEAK(I)               
+            WRITE(6,*)'IPEAK,IFIRST,IMAX,NX :',IPEAK(I),IFIRST,IMAX,NX          
+            NX = 0                                                              
+          ENDIF                                                                 
+          IF ( I .GT. 1 ) THEN                                                  
+            DX = XHIT(I) - XHIT(I-1)                                            
+            IF ( FLAGSI(7) ) THEN                                               
+              CALL HFILL(47230,DX,0.,1.)                                        
+            ENDIF                                                               
+          ENDIF                                                                 
+          IF ( NX .EQ. 1 ) THEN                                                 
+            ERRX(I) = 15.E-4                                                    
+          ELSE                                                                  
+            ERRX(I) = 20.E-4                                                    
+          ENDIF                                                                 
+         ENDIF                                                                  
+ 20     CONTINUE                                                                
+      ELSE                                                                      
+        WRITE(6,*)'SICLUX CALLED WITH EMPTY CLUSTER; NP = ',NP                  
+        NX = 0                                                                  
+      ENDIF                                                                     
+*                                                                               
+      IF ( NX .LE. 0 ) THEN                                                     
+        NX = 0                                                                  
+        RETURN                                                                  
+      ENDIF                                                                     
+*                                                                               
+      IMIN = IFIRST                                                             
+      IMAX = IFIRST + NP - 1                                                    
+      DO 40 I=1,NX                                                              
+        XHIT(I) = XHIT(I) - SIDX(ISIDET) - AAX(ISIDET)*XHIT(I)                  
+        XHIT(I) = XHIT(I) - STRDX(IPEAK(I),I)                                   
+        IF ( IPEAK(I).GT. 100 ) THEN                                            
+          IF ( IPEAK(I) .LE. 200 ) THEN                                         
+            XHIT(I) = XHIT(I) + BBY(ISIDET)*0.2*FLOAT(ISIDET)                   
+          ELSEIF ( IPEAK(I) .LE. 300 ) THEN                                     
+            XHIT(I) = XHIT(I) - BBY(ISIDET)*0.2*FLOAT(ISIDET)                   
+          ENDIF                                                                 
+        ENDIF                                                                   
+CCCCCCC IF ( ISIDET .EQ. 2 ) THEN                                               
+C         JJ = NINT((IPEAK(I)+50)*0.01)                                         
+C         XHIT(I) = XHIT(I) - AALIN(JJ)*XHIT(I) - BBLIN(JJ)                     
+C         XHIT(I) = XHIT(I) - BBFIX(IPEAK(I))                                   
+CCCCCCC ENDIF                                                                   
+        JJ = NINT((IPEAK(I)+5)*0.1)                                             
+        XHIT(I) = XHIT(I) - BBFIX(JJ,ISIDET)                                    
+        JJ = NINT((IPEAK(I)+50)*0.01)                                           
+        XHIT(I)=XHIT(I)-2*AAALIN(JJ,ISIDET)*XHIT(I)-2*BBBLIN(JJ,ISIDET)         
+        IF ( IPEAK(I) .LT. IMIN ) THEN                                          
+          WRITE(6,*)'SICLUX ERROR : IPEAK .LT. IFIRST'                          
+          WRITE(6,*)'IPEAK,IFIRST,IMAX,NX :',IPEAK(I),IFIRST,IMAX,NX            
+        ELSEIF ( IPEAK(I) .GT. IMAX ) THEN                                      
+          WRITE(6,*)'SICLUX ERROR : IPEAK .GT. IMAX'                            
+          WRITE(6,*)'IPEAK,IFIRST,IMAX,NX :',IPEAK(I),IFIRST,IMAX,NX            
+        ENDIF                                                                   
+ 40   CONTINUE                                                                  
+*                                                                               
+      RETURN                                                                    
+      END                                                                       
++DECK,SIVERT.                                                                   
+C***********************************************************                    
+      SUBROUTINE SIVERT                                                         
+C-----------------------------------------------------------                    
+C   Reconstruct a primary interaction vertex from the tracks                    
+C   in Si-strips.                                                               
+C   Ouput in +CDE,SICVRT, and label 4547 :                                      
+C                                                                               
+C      Label 4547 :                                                             
+C  ---------------------------------------------------------                    
+C     word 1 : # tracks in vertex ( 0 if no vertex found ) I                    
+C          2 : x of vertex                                 R                    
+C          3 : z of vertex                                 R                    
+C          4 :  reserved                                   R                    
+C          5      for                                      R                    
+C          6   covariance                                  R                    
+C          7 :   matrix.                                   R                    
+C          8 : Chi-2 of vertex                             R                    
+C          9..9+NTRACKS-1 : List of tracks in vertex       I                    
+C                           (index to track bank)                               
+C                                                                               
+C***********************************************************                    
+C                                                                               
++CDE,SICTRK.                                                                    
++CDE,SICVRT.                                                                    
++CDE,SICOM.                                                                     
+      REAL DAT(100)                                                             
+      INTEGER IDAT(100)                                                         
+      EQUIVALENCE(DAT(1),IDAT(1))                                               
+C                                                                               
+      SVERTX(1) = 0.                                                            
+      SVERTX(2) = 0.                                                            
+      SVERTX(3) = +1.                                                           
+      CHI2 = 99999.                                                             
+      CHIVRX = 99999.                                                           
+      IF ( NTRKSI .GE. 3 ) THEN                                                 
+C                                                                               
+        CALL UFILL(UTRK,1,MXTRK,.TRUE.)                                         
+        NUTRK = NTRKSI                                                          
+*                        (** Cut at |dx|>150 micron)                            
+        DXMAXA = .0250                                                          
+*                                                                               
+*--------------------------------------------------------------------           
+*                        (** Start of the loop **)                              
+*--------------------------------------------------------------------           
+ 5      CONTINUE                                                                
+        SK  = 0.                                                                
+        SK2 = 0.                                                                
+        SM  = 0.                                                                
+        SKM = 0.                                                                
+        DO 10 I = 1,NTRKSI                                                      
+          IF (UTRK(I)) THEN                                                     
+            SK  = SK + SLOPE(I)                                                 
+            SK2 = SK2 + SLOPE(I)*SLOPE(I)                                       
+            SM  = SM + OFSET(I)                                                 
+            SKM = SKM + SLOPE(I)*OFSET(I)                                       
+          ENDIF                                                                 
+ 10     CONTINUE                                                                
+*       WRITE(6,143)NTRKSI,SK,SK2,SKM,SM                                        
+ 143    FORMAT(1X,'N,SK,SK2,SKM,SM = ',I3,4F9.3)                                
+*                                                                               
+        ATRKSI = NUTRK                                                          
+        DD = (ATRKSI*SK2-SK*SK)                                                 
+        IF ( DD .NE. 0 ) THEN                                                   
+          Z = (SM*SK - ATRKSI*SKM)/DD                                           
+          X = (SM*SK2 - SK*SKM)/DD                                              
+        ELSE                                                                    
+          Z = -999999.                                                          
+        ENDIF                                                                   
+*                                                                               
+CCCC    WRITE(6,*)'SIVERT; OLDX,X,Z = ',OLDX,X,Z                                
+*                                                                               
+        CHI2 = 0.                                                               
+        DXMAX = 0.                                                              
+        IDXMAX = 0                                                              
+        DO 20 I=1,NTRKSI                                                        
+          IF (UTRK(I)) THEN                                                     
+            DX = SLOPE(I)*Z+OFSET(I) - X                                        
+            IF (ABS(DX).GT.DXMAX) THEN                                          
+              DXMAX=ABS(DX)                                                     
+              IDXMAX=I                                                          
+            ENDIF                                                               
+          ENDIF                                                                 
+ 20     CONTINUE                                                                
+*       (** loop if dx too high and more than 3 tracks **)                      
+*       (** Otherwise keep that vertex                 **)                      
+        IF ((DXMAX.GT.DXMAXA).AND.(NUTRK.GT.3).AND.(IDXMAX .GT.0)) THEN         
+          UTRK(IDXMAX)=.FALSE.                                                  
+          NUTRK=NUTRK-1                                                         
+C           Loop !!!                                                            
+            GOTO 5                                                              
+*                                                                               
+        ELSE                                                                    
+          DO 30 I=1,NTRKSI                                                      
+            DX = SLOPE(I)*Z+OFSET(I) - X                                        
+            CALL HFILL(47408,DX,0.,1.)                                          
+            IF (UTRK(I)) THEN                                                   
+CC           *IF ( DOFSET(I) .GT. 0 ) THEN                                      
+C            *  DDX = DOFSET(I)                                                 
+CC           *ELSE                                                              
+                DDX = 0.0020                                                    
+CC           *ENDIF                                                             
+              CHI2 = CHI2 + DX*DX/(DDX*DDX)                                     
+              CALL HFILL(47404,DX,0.,1.)                                        
+            ENDIF                                                               
+ 30       CONTINUE                                                              
+*         WRITE(6,*)'CHI2 OF VERT = ',CHI2                                      
+          CALL HFILL(47405,CHI2,0.,1.)                                          
+          CALL HFILL(47406,FLOAT(NUTRK),0.,1.)                                  
+          CALL HFILL(47407,FLOAT(NTRKSI-NUTRK),0.,1.)                           
+*                                                                               
+          SVERTX(1) = X                                                         
+          SVERTX(2) = 0.                                                        
+          SVERTX(3) = Z                                                         
+          CHIVRX = CHI2                                                         
+          CALL HFILL(47401,X,0.,1.)                                             
+          CALL HFILL(47403,Z,0.,1.)                                             
+        ENDIF                                                                   
+      ELSEIF ( NTRKSI .EQ. 2 ) THEN                                             
+        NUTRK = 2                                                               
+        UTRK(1) = .TRUE.                                                        
+        UTRK(2) = .TRUE.                                                        
+        IF ( SLOPE(1) .NE. SLOPE(2) ) THEN                                      
+          SVERTX(3) = (OFSET(2)-OFSET(1))/(SLOPE(1)-SLOPE(2))                   
+          SVERTX(1) = SLOPE(1)*SVERTX(3) + OFSET(1)                             
+        ENDIF                                                                   
+      ELSEIF ( NTRKSI .EQ. 1 ) THEN                                             
+        NUTRK = 0                                                               
+        UTRK(1) = .FALSE.                                                       
+        IF ( SLOPE(1) .NE. 0 ) THEN                                             
+          SVERTX(3) = -OFSET(1)/SLOPE(1)                                        
+          IF (( SVERTX(3) .LT. -0.5 ) .OR. ( SVERTX(3) .GT. 2.5 )) THEN         
+            SVERTX(3) = +1.                                                     
+          ELSE                                                                  
+            NUTRK = 1                                                           
+            UTRK(1) = .TRUE.                                                    
+          ENDIF                                                                 
+        ENDIF                                                                   
+      ELSE                                                                      
+        NUTRK = 0                                                               
+      ENDIF                                                                     
+*                                                                               
+*   Make label 4547 :                                                           
+      IDAT(1) = NUTRK                                                           
+       DAT(2) = SVERTX(1)                                                       
+       DAT(3) = SVERTX(3)                                                       
+       DAT(8) = CHI2                                                            
+      K = 0                                                                     
+      DO 74 I=1,NTRKSI                                                          
+        IF ( UTRK(I) ) THEN                                                     
+          K=K+1                                                                 
+          IDAT(8+K) = I                                                         
+          IF ( FLAGSI(7) ) THEN                                                 
+            CALL HFILL(47422,CHISQ(I),0.,1.)                                    
+          ENDIF                                                                 
+        ELSE                                                                    
+          IF ( FLAGSI(7) ) THEN                                                 
+            CALL HFILL(47423,CHISQ(I),0.,1.)                                    
+          ENDIF                                                                 
+        ENDIF                                                                   
+ 74   CONTINUE                                                                  
+      LENGTH = 8+K                                                              
+      IF ( NUTRK .NE. K ) THEN                                                  
+        WRITE(6,*)'SIVERT ERROR; K <> NUTRK : ',K,NUTRK                         
+        IDAT(1) = K                                                             
+        NUTRK = K                                                               
+      ENDIF                                                                     
+      CALL LBSTOR(4547,DAT,LENGTH,-1,1)                                         
+*                                                                               
+      RETURN                                                                    
+      END                                                                       

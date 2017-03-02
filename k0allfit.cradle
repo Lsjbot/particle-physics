@@ -1,0 +1,1399 @@
++USE,IBM.                         Select machine.                               
++USE,CERN.                  Switch on CERN flag.                                
+C+USE,FLUC.                                                                     
+C+USE,K0MCARLO.                                                                 
++USE,*NA34CRA.              USE pilot-patch in NA34 cradle.                     
++EXE,*NA34CRA.              EXE pilot-patch in NA34 cradle.                     
++SELF.                      User changes to +KEEPs in NA34 PAM here             
++REP,P=SANDCDES,D=,C=2.                                                         
+       COMMON//IZSFS1(1),ILBLNK(200000),LBFEND                                  
++REP,P=SANDCDES,D=,C=9.                                                         
+       HBRSRV = 30000                                                           
++SELF.                      User KEEP sequences after this card                 
++KEEP,MYCOUN. My event counter                                                  
+      COMMON/MYCOUN/JLEVEN,NK0,NNOK0,NT,NF,NNID                                 
++KEEP,K0LABELS,IF=FLUC.                                                         
+      PARAMETER ( LAHEAD = 47027 )                                              
+      PARAMETER ( LAXREF = 47296 )                                              
+      PARAMETER ( LATRAK = 47127 )                                              
+      PARAMETER ( LASEG  = 47327 )                                              
++KEEP,K0LABELS,IF=-FLUC.                                                        
+      PARAMETER ( LAHEAD = 7027 )                                               
+      PARAMETER ( LAXREF = 7296 )                                               
+      PARAMETER ( LATRAK = 7127 )                                               
+      PARAMETER ( LASEG  = 7327 )                                               
++KEEP,K0COM.                                                                    
+      PARAMETER ( MAXTRK = 200 )                                                
+      PARAMETER ( MXPAIR = 100 )                                                
+      COMMON/K0CTRK/TRKPAR(8,MAXTRK), PLUC(3,MAXTRK),MCTRK(MAXTRK),             
+     *              MCVERT(3), PRIMRY(MAXTRK), R0SQR(MAXTRK),                   
+     *              N2NDRY,TPAIRS(MXPAIR,MXPAIR),MCFLAG,                        
+     *              NRPFP,NRPFS,NRSFP,NRSFS,IT1A,IT1F,IT2A,IT3D,ITALL,          
+     *              INTR(40),XPRIM,YPRIM,ZPRIM,NTR                              
+      COMMON/K0CPAR/ITPAIR(2,MXPAIR),IRTP,IFTP,NPAIRS,                          
+     *              ZPAIR(MXPAIR),ICHRGE(MAXTRK),IPTYPE(MXPAIR),                
+     *              LUC7(MAXTRK),YPAIR(MXPAIR),XPAIR(MXPAIR),IPAIR,             
+     *              P0SQR,P1SQR,P2SQR,KPRINT,PTFIT(MXPAIR),                     
+     *              FRECON(MXPAIR),PFIT(4,MXPAIR),IDFIT(MXPAIR)                 
+      COMMON/K0CORI/IPORIG(MXPAIR),PORIG(4,MXPAIR),ZORIG(MXPAIR),               
+     *              TRECON(MXPAIR),IVORIG(MXPAIR),TORIG(MXPAIR),                
+     *              PTORIG(MXPAIR)                                              
+      COMMON/K0DOND/MUTSID,MAFTER,MFALSE,MCLOSE,MPAIR(MAXTRK),                  
+     *              MFREC,MNFREC                                                
+C                                                                               
+      COMMON/K0CUTC/ CHICUT(6),VRTCUT,VCUT2,CUTMAS,OPANGC,PANGC                 
+     *              ,PPIANG,ANGPPR,ZVMIN                                        
+C                                                                               
+      LOGICAL PRIMRY,MCFLAG,FRECON,KPRINT,TRECON,TORIG                          
+*      Functions : !                                                            
+      CHARACTER*12 K0PNAM                                                       
+      LOGICAL K0IFV0,K0LAM                                                      
+*                                                                               
+      PARAMETER ( LOZV   = 1., LOSEPR = 2., LOCHI2 = 3., LOMASS = 4. )          
+      PARAMETER ( LOVPRM = 5. )                                                 
+*                                                                               
++KEEP,K0COMDOC.                                                                 
+C=======================================================================        
+C   MAXTRK : Max. # of tracks per event that can be handled.                    
+C   MXPAIR :  "    "   pair candidates "    "      "                            
+C                                                                               
+C   TRKPAR : Geometrical track parameters, taken from Lucifer.                  
+C   PLUC   : Fitted momentum.                                                   
+C   MCTRK,MCVERT : Cross-reference tables for MC-runs.                          
+C   PRIMRY : Flagging a track as "primary" (originating from target).           
+C   R0SQR  : Closest approach to target (squared).                              
+C   N2NDRY : # of "secondary" tracks (not coming from target)                   
+C   TPAIRS : Table of closest approach between all pairs of secondaries.        
+C   MCFLAG : True if MC-run.                                                    
+C   NRPFP  : # primaries identified as primaries.                               
+C     :                                                                         
+C   NRSFS  : # secondaries    "     "  secondaries.                             
+C   IT1A..ITALL : #tracks going through various parts of the DC:s               
+C   INTR                                                                        
+C   ITPAIR : table of tracks identified as pairs.                               
+C   IRTP   : # of real track pairs.                                             
+C   IFTP   : # of false  "     "                                                
+C   NPAIRS : # of pairs found.                                                  
+C   XPAIR  : x of common vertex for pairs.                                      
+C   YPAIR  : y of common vertex for pairs.                                      
+C   ZPAIR  : z of common vertex for pairs.                                      
+C   ICHRGE : charge of particle (0 if unknown).                                 
+C   IPTYPE : type of reconstruction                                             
+C   LUC7   : Bit pattern with flags, taken from word 7 in a Lucifer bank        
+C   IPAIR  : Current pair number (loop index used in many subs)                 
+C   IPORIG : Particle type that made a pair.            \_ mc only              
+C   PORIG  : True momentum of original particle.        /                       
+C   P0SQR  : Reconstructed momentum of same.                                    
+C   P1SQR  : Reconstructed momentum of decay ptcle 1                            
+C   P2SQR  : Reconstructed momentum of decay ptcle 2                            
+C   FRECON : Flag telling whether this pair was reconstructed                   
+C   PFIT   ; Fitted momentum a V0; |p| = -BIG if no fit.                        
+C   IDFIT  : V0 identified as particle #IDFIT; -1 if no fit.                    
+C   ZORIG  : True z of V0 ( MC only )                                           
+C   KPRINT : Print flag, turned off after 50 events, usually.                   
+C   TRECON : True if reconstr. particle correctly identified.                   
+C   TORIG  : True if real pair, false if chance combination.                    
+C   IVORIG : # MC vertex origin                                                 
+C   PTFIT  : Fit to transverse momentum.                                        
+C   PTORIG : Original transverse momentum.                                      
+C                                                                               
+C=======================================================================        
++KEEP,K0PARDIM.                                                                 
+*                                                                               
+      PARAMETER ( NVDIM  =   1 )                                                
+      PARAMETER ( NHMAX  = 100 )                                                
+      PARAMETER ( NHDIM  =   4 )                                                
+      PARAMETER ( BIG    =   1E30 )                                             
+      PARAMETER ( PI     =   3.141592654 )                                      
+C     (** Effective field and fieldsize calculated  **)                         
+C     (** from map in DCFLD.                        **)                         
+      PARAMETER ( FLDMAG =   0.1297 )                                           
+      PARAMETER ( SMAG   = 125.5 )                                              
+      PARAMETER ( EMAG   = 196.0 )                                              
+      PARAMETER ( FLDLEN = EMAG - SMAG )                                        
+      PARAMETER ( CMAG   = 160.75 )                                             
+      PARAMETER ( PTKICK =  -0.00004 )                                          
+      PARAMETER ( CURR   = 700. )                                               
+      PARAMETER ( SDC1   =  70.0 )                                              
+      PARAMETER ( SDC3   = 310.0 )                                              
+      PARAMETER ( EC     =   2.997925E-4 )                                      
+      PARAMETER ( BSIGN  = +1. )                                                
+      PARAMETER ( MXITER = 40 )                                                 
+      DIMENSION NUMVS(NVDIM),NUMBV(NVDIM,NHMAX)                                 
+      DIMENSION HITS(NHDIM,NHMAX),ITRA(NHMAX)                                   
+C                                                                               
++KEEP,K0MASSES.                                                                 
+       PARAMETER ( WK0    = 0.49767  )                                          
+       PARAMETER ( WLAM   = 1.11560  )                                          
+       PARAMETER ( WPI    = 0.135967 )                                          
+       PARAMETER ( WPROT  = 0.93828  )                                          
+       PARAMETER ( TWOPI2 = 2*WPI*WPI )                                         
+       PARAMETER ( PIPRO2 = WPI*WPI + WPROT*WPROT )                             
+C                (* CENTIMETRES/second !! : *)                                  
+       PARAMETER ( CLIGHT = 2.997925E10 )                                       
+       PARAMETER ( CTK0   = 8.923E-11 * CLIGHT )                                
+       PARAMETER ( CTLAM  = 2.632E-10 * CLIGHT )                                
+C                                                                               
+       COMMON/K0MASS/MASFIT,WM0,WM1,WM2,POK0,POLAM1,POLAM2                      
+C                                                                               
+       LOGICAL MASFIT,POK0,POLAM1,POLAM2                                        
+C                                                                               
++KEEP,K0COMR.                                                                   
+C                                                                               
+       PARAMETER ( NRULES = 100 )                                               
+C                                                                               
+       COMMON/K0COMR/CUT(NRULES)   ,IPAR(NRULES)  ,WABOVE(NRULES)               
+     *              ,WBELOW(NRULES),IPABOV(NRULES),IPBELO(NRULES)               
+     *              ,SRULE(NRULES) ,BID(NRULES)   ,IPBID(NRULES)                
+     *              ,NWRAB(NRULES) ,NWRBEL(NRULES),NWRONG(NRULES)               
+     *              ,NRIGHT(NRULES),BIDTRS,KRULES,NINVOK                        
+     *              ,SFREEZ,CFREEZ,BFREEZ,NDCUT,NABRW(2,2,NRULES)               
+     *              ,NAFCUT(NRULES),TBIDR,TBIDW,NBIDR,NBIDW                     
+     *              ,NRMFIT,NWMFIT,NRRULE,NWRULE                                
+C                                                                               
+       LOGICAL SFREEZ,CFREEZ,BFREEZ                                             
+C                                                                               
+       INTEGER BELOW,ABOVE,RIGHT,WRONG                                          
+       PARAMETER ( BELOW = 1 )                                                  
+       PARAMETER ( ABOVE = 2 )                                                  
+       PARAMETER ( RIGHT = 1 )                                                  
+       PARAMETER ( WRONG = 2 )                                                  
+C                                                                               
++KEEP,K0RPAR.                                                                   
+C                                                                               
+      PARAMETER ( NRPAR = 60 )                                                  
+C                                                                               
+      COMMON/K0RPAR/P2K0,P2KPI1,P2KPI2,OPENK ,THE1K ,THE2K ,THEK ,ZK            
+     *           ,P2LAM1,P2L1PR,P2L1PI,OPENL1,THERL1,THEPL1,THEL1,ZL1           
+     *           ,PTK0,PTLAM,DUMPAR(NRPAR-18)                                   
+C                                                                               
+      DIMENSION RPAR(NRPAR)                                                     
+      EQUIVALENCE ( RPAR(1),P2K0 )                                              
+C                                                                               
++KEEP,K0C4DOC.                                                                  
+                                                                                
+1 : Decays before DC1; both through magnet                                      
+2 : Decays before DC1; one through magnet                                       
+3 : Decays before DC1; none through magnet                                      
+4 : Decays in magnet                                                            
+5 : Decays in DC1                                                               
+6 : Decays after magnet                                                         
++KEEP,K0MDIM1.                                                                  
+       PARAMETER ( MAXDIM = 20 )                                                
+       PARAMETER ( NVM    = 17 )                                                
+       PARAMETER ( NVU    =  6 )                                                
+       PARAMETER ( NFCON  = 10  )                                               
++KEEP,K0MDIM2.                                                                  
+       PARAMETER ( MAXDIM = 15 )                                                
+       PARAMETER ( NVM    = 11 )                                                
+       PARAMETER ( NVU    =  3 )                                                
+       PARAMETER ( NFCON  =  5 )                                                
++KEEP,K0MDIM3.                                                                  
+       PARAMETER ( MAXDIM = 15 )                                                
+       PARAMETER ( NVM    = 11 )                                                
+       PARAMETER ( NVU    =  3 )                                                
+       PARAMETER ( NFCON  =  5 )                                                
++KEEP,K0MDIM4.                                                                  
+       PARAMETER ( MAXDIM = 20 )                                                
+       PARAMETER ( NVM =10)                                                     
+       PARAMETER ( NVU = 3)                                                     
+       PARAMETER ( NFCON  =  7 )                                                
++KEEP,K0MDIM5.                                                                  
+       PARAMETER ( MAXDIM = 15 )                                                
+       PARAMETER ( NVM    = 15 )                                                
+       PARAMETER ( NVU    =  5 )                                                
+       PARAMETER ( NFCON  = 11 )                                                
++KEEP,K0MDIM6.                                                                  
+       PARAMETER ( MAXDIM = 15 )                                                
+       PARAMETER ( NVM    = 11 )                                                
+       PARAMETER ( NVU    =  3 )                                                
+       PARAMETER ( NFCON  =  5 )                                                
++KEEP,K04COM.                                                                   
+       COMMON/K04COM/THE01,THE02,DTHE1,DTHE2                                    
++KEEP,K0GLSQCM.                                                                 
+C-----------------------------------------------------------------------        
+C                                                                               
+       COMMON/K0GLSC/VM(NVM),VU(NVU),VUOLD(NVU),                                
+C                     [ VM : vector with NVM measured quantities.               
+C                     [ VU : vector with NVU unmeasured quantities.             
+     *               COV(NVM,NVM),COVINV(NVM,NVM),ETA(NVM),                     
+C                     [ COV : covariance matrix for VM                          
+C                     [ ETA : "improved" values for VM                          
+     *               FCON(NFCON),GRMULT(NFCON),                                 
+C                     [ FCON: NFCON constraint equations, evaluated.            
+C                     [ GRMULT : Lagrange multipliers for FCON                  
+     *               DFDM(NFCON,NVM),DFDU(NFCON,NVU),                           
+C                     [ DFDM: dFCON/dVM matrix                                  
+C                     [ DFDU: dFCON/dVU matrix                                  
+     *               R(NFCON),S(NFCON,NFCON),G(MAXDIM,MAXDIM),                  
+     *               U(MAXDIM,MAXDIM),H(MAXDIM,MAXDIM),                         
+C                     [ R,S,G,U,H : auxiliary matrices                          
+     *               VMMETA(NVM),SINV(NFCON,NFCON)                              
+C                     [ VMMETA = VM - ETA ]                                     
+C-------------------------------------------------------------------            
++KEEP,K0GLSQA.   Generalized least-squares, common part of code.                
+C                                                                               
+        DIMENSION FTSFU(NVU,NVU)                                                
+        DIMENSION KLADD(MAXDIM),KLADD2(MAXDIM)                                  
+        DIMENSION DVU(NVU)                                                      
+C                                                                               
+CCCCC   DIMENSION VULIM(2,NVU)                                                  
+C       DATA  VULIM/ -25. , 25.                                                 
+C    *             ,   1. ,200.                                                 
+CCCCC*             ,   1. ,200./                                                
+C                                                                               
+C      Calculate R :                                                            
+C                                                                               
+        CALL UCOPY(FCON,R,NFCON)                                                
+C        (** R := R + DFDM*VMMETA **)                                           
+        CALL RMMPA(NFCON,NVM,DFDM(1,1),DFDM(1,2),DFDM(2,1)                      
+     *            ,VMMETA(1),VMMETA(2),R(1),R(2))                               
+C                                                                               
+C      Calculate S :                                                            
+C                                                                               
+        CALL RMMLT(NVM,NVM,NFCON,COV(1,1),COV(1,2),COV(2,1)                     
+     *    ,DFDM(1,1),DFDM(2,1),DFDM(1,2),G(1,1),G(1,2),G(2,1),DUMMY)            
+        CALL RMMLT(NFCON,NVM,NFCON,DFDM(1,1),DFDM(1,2),DFDM(2,1)                
+     *       ,G(1,1),G(1,2),G(2,1),S(1,1),S(1,2),S(2,1),DUMMY)                  
+C                                                                               
+C      Calculate a new vector VU for the unknowns :                             
+C                                                                               
+        CALL UCOPY(S,SINV,NFCON*NFCON)                                          
+        CALL RINV(NFCON,SINV,NFCON,KLADD,IFAIL)                                 
+        IF ( IFAIL .NE. 0 ) THEN                                                
+          WRITE(6,*)'ERROR in RINV; S is singular.'                             
+          CHI2 = 1E30                                                           
+          RETURN                                                                
+        ENDIF                                                                   
+        CALL RMMLT(NVU,NFCON,NFCON,DFDU(1,1),DFDU(2,1),DFDU(1,2)                
+     *   ,SINV(1,1),SINV(1,2),SINV(2,1),H(1,1),H(1,2),H(2,1),DUMMY)             
+        CALL RMMLT(NVU,NFCON,NVU,H(1,1),H(1,2),H(2,1)                           
+     *               ,DFDU(1,1),DFDU(1,2),DFDU(2,1)                             
+     *               ,FTSFU(1,1),FTSFU(1,2),FTSFU(2,1),DUMMY)                   
+        CALL RINV(NVU,FTSFU,NVU,KLADD,IFAIL)                                    
+        IF ( IFAIL .NE. 0 ) THEN                                                
+          WRITE(6,*)'ERROR in RINV; FTSFU is singular.'                         
+          CHI2 = 1E30                                                           
+          RETURN                                                                
+        ENDIF                                                                   
+        CALL RMMLT(NVU,NVU,NFCON,FTSFU(1,1),FTSFU(1,2),FTSFU(2,1)               
+     *        ,H(1,1),H(1,2),H(2,1),U(1,1),U(1,2),U(2,1),DUMMY)                 
+        CALL UCOPY(VU,VUOLD,NVU)                                                
+        CALL RMMPY(NVU,NFCON,U(1,1),U(1,2),U(2,1)                               
+     *        ,R(1),R(2),DVU(1),DVU(2))                                         
+        CALL VSUB(VUOLD,DVU,VU,NVU)                                             
+C----------------------                                                         
+CC        DO 45 I=1,NVU                                                         
+CC          IF ( VU(I) .LT. VULIM(1,I) ) THEN                                   
+CC            VU(I) = VULIM(1,I)                                                
+CC          ELSEIF ( VU(I) .GT. VULIM(2,I)) THEN                                
+CC            VU(I) = VULIM(2,I)                                                
+CC          ENDIF                                                               
+CC 45     CONTINUE                                                              
+C----------------------                                                         
+        CALL VSUB(VUOLD,VU,DVU,NVU)                                             
+C                                                                               
+C      Calculate new Lagrangian multipliers :                                   
+C                                                                               
+        CALL RMMPY(NFCON,NVU,DFDU(1,1),DFDU(1,2),DFDU(2,1)                      
+     *         ,DVU(1),DVU(2),KLADD(1),KLADD(2))                                
+        CALL VSUB(R,KLADD,KLADD2,NFCON)                                         
+        CALL RMMPY(NFCON,NFCON,SINV(1,1),SINV(1,2),SINV(2,1)                    
+     *         ,KLADD2(1),KLADD2(2),GRMULT(1),GRMULT(2))                        
+C                                                                               
+C     Calculate improved values for measured variables :                        
+C                                                                               
+        CALL RMMPY(NVM,NFCON,G(1,1),G(1,2),G(2,1),                              
+     *             GRMULT(1),GRMULT(2),VMMETA(1),VMMETA(2))                     
+        CALL VSUB(VM,VMMETA,ETA,NVM)                                            
+C                                                                               
++SELF.==================================================================        
++KEEP,K0GLSQB1.  Generalized least-squares, special section, type 1.            
+C     Calculate Chi2                                                            
+C        (first recalculate the constraint functions)                           
+        CALL K0CON1                                                             
+C                                                                               
+        CALL RMMPY(NFCON,NFCON,S(1,1),S(1,2),S(2,1),                            
+     *           GRMULT(1),GRMULT(2),KLADD(1),KLADD(2))                         
+C                                                                               
+        CHI2 = ABS(VDOT(GRMULT,KLADD,NFCON))                                    
+     *     + 2*ABS(VDOT(GRMULT,FCON,NFCON))                                     
++SELF.==================================================================        
++KEEP,K0GLSQB2.  Generalized least-squares, special section, type 2.            
+C     Calculate Chi2                                                            
+C        (first recalculate the constraint functions)                           
+        CALL K0CON2                                                             
+C                                                                               
+        CALL RMMPY(NFCON,NFCON,S(1,1),S(1,2),S(2,1),                            
+     *           GRMULT(1),GRMULT(2),KLADD(1),KLADD(2))                         
+C                                                                               
+        CHI2 = ABS(VDOT(GRMULT,KLADD,NFCON))                                    
+     *     + 2*ABS(VDOT(GRMULT,FCON,NFCON))                                     
++SELF.==================================================================        
++KEEP,K0GLSQB3.  Generalized least-squares, special section, type 3.            
+C     Calculate Chi2                                                            
+C        (first recalculate the constraint functions)                           
+        CALL K0CON3                                                             
+C                                                                               
+        CALL RMMPY(NFCON,NFCON,S(1,1),S(1,2),S(2,1),                            
+     *           GRMULT(1),GRMULT(2),KLADD(1),KLADD(2))                         
+C                                                                               
+        CHI2 = ABS(VDOT(GRMULT,KLADD,NFCON))                                    
+     *     + 2*ABS(VDOT(GRMULT,FCON,NFCON))                                     
++SELF.==================================================================        
++KEEP,K0GLSQB4.  Generalized least-squares, special section, type 4.            
+C     Calculate Chi2                                                            
+C        (first recalculate the constraint functions)                           
+        CALL K0CON4                                                             
+C                                                                               
+        CALL RMMPY(NFCON,NFCON,S(1,1),S(1,2),S(2,1),                            
+     *           GRMULT(1),GRMULT(2),KLADD(1),KLADD(2))                         
+C                                                                               
+        CHI2 = ABS(VDOT(GRMULT,KLADD,NFCON))                                    
+     *     + 2*ABS(VDOT(GRMULT,FCON,NFCON))                                     
++SELF.==================================================================        
++KEEP,K0GLSQB5.  Generalized least-squares, special section, type 4.            
+C     Calculate Chi2                                                            
+C        (first recalculate the constraint functions)                           
+        CALL K0CON5                                                             
+C                                                                               
+        CALL RMMPY(NFCON,NFCON,S(1,1),S(1,2),S(2,1),                            
+     *           GRMULT(1),GRMULT(2),KLADD(1),KLADD(2))                         
+C                                                                               
+        CHI2 = ABS(VDOT(GRMULT,KLADD,NFCON))                                    
+     *     + 2*ABS(VDOT(GRMULT,FCON,NFCON))                                     
++SELF.==================================================================        
++KEEP,K0GLSQB6.  Generalized least-squares, special section, type 4.            
+C     Calculate Chi2                                                            
+C        (first recalculate the constraint functions)                           
+        CALL K0CON6                                                             
+C                                                                               
+        CALL RMMPY(NFCON,NFCON,S(1,1),S(1,2),S(2,1),                            
+     *           GRMULT(1),GRMULT(2),KLADD(1),KLADD(2))                         
+C                                                                               
+        CHI2 = ABS(VDOT(GRMULT,KLADD,NFCON))                                    
+     *     + 2*ABS(VDOT(GRMULT,FCON,NFCON))                                     
++SELF.==================================================================        
++SELF.                                                                          
++PAM,12,R=CDECRA.                                                               
++PAM,13,R=GCDES.                                                                
++PAM,11.                                                                        
++PAM,12,T=RESUME.                                                               
++SELF.                      Changes to NA34 routines goes in here               
++USE,P=SALBMAIN,D=LBMAIN                                                        
++EXE,P=SALBMAIN,D=LBMAIN                                                        
++PAM,11.                                                                        
++PATCH,MYDECKS.                                                                 
++DECK, MYINI.  Routine called before anything is read                           
+*                                                                               
+* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX                
+*                                                                               
+      SUBROUTINE MYINI (IRUN)                                                   
+* *> Pick up my +KEEPs                                                          
++CDE,MYCOUN,DIPYT,DISET.                                                        
++CDE,K0COM.                                                                     
+* *> Pick up Sandra commons                                                     
++CDE,SAPCTL,SALLIO.                                                             
+* *************************************************************                 
+*   Initiate Sandra                                                             
+* ---                                                                           
+* *> Nb inputs                                                                  
+      NINPTS = 1                                                                
++SELF,IF=APOLLO.                                                                
+      RDFILN(1) = 'K0FLUC.DAT'                                                  
++SELF.                                                                          
+* *> Nb outputs                                                                 
+      NOTPTS = 0                                                                
+* *> Set time limit                                                             
+      TQUIT = 10.0                                                              
+      ZBKFMS(1) = .TRUE.                                                        
+* *> Initialize event counter                                                   
+      JLEVEN = -1                                                               
+* *************************************************************                 
+*   Initiate GEANT                                                              
+* ---                                                                           
+* *> Set The Time (Last of December, 1985 at twelwe o'clock)                    
+      CALL UGDATE( 1988, 08, 01, 12.00, 1 )                                     
+* *> Set volumes active                                                         
+      ZMAX = 360.0                                                              
+      CALL DISETS( ZMAX )                                                       
+      CALL UGSETS( 'EDC ', 1 )                                                  
+* *> Switch off  UGINIT extended printing                                       
+      CALL CEXIST( 'PRNT', .FALSE. )                                            
+      CALL CEXIST( 'ERRP', .FALSE. )                                            
+* *> SELECT GEOMETRY                                                            
+      CALL CEXIST('ALL ',.FALSE.)                                               
+      CALL CEXIST('EDC ',.TRUE.)                                                
+      CALL CEXIST('EDC1',.TRUE.)                                                
+      CALL CEXIST('EDC2',.TRUE.)                                                
+      CALL CEXIST('EDC3',.TRUE.)                                                
+* *> Initialize the geometry                                                    
+      CALL  UGINIT                                                              
+* *> Initialize GEANT particle tables                                           
+      CALL GPART                                                                
+* *> Initialize GEANT physics processes                                         
+******CALL GPHYSI                                                               
+*                                                                               
+*    (***  Initialize the K0-programs ***)                                      
++SELF,IF=K0MCARLO.                                                              
+      MCFLAG = .TRUE.                                                           
++SELF,IF=-K0MCARLO.                                                             
+      MCFLAG = .FALSE.                                                          
++SELF.                                                                          
+      CALL K0INIT(MCFLAG)                                                       
+*                                                                               
+* *> That's it                                                                  
+      END                                                                       
++DECK, MYEVNT. Routine called after each reading                                
+*                                                                               
+* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX                     
+*                                                                               
+      SUBROUTINE MYEVNT(ISTAT)                                                  
+* *> Pick up Sandra commons                                                     
++CDE,SALLIO,SAPCTL,SAGNAM.                                                      
++CDE,LCCTRL.                                                                    
+* *> Pick up my event counter                                                   
++CDE,MYCOUN.                                                                    
++CDE,K0COM.                                                                     
+      DIMENSION PBEAM(4),PMOM(4)                                                
+* ******************************************************                        
+*  Handle the run header/initialization           ******                        
+* ******************************************************                        
+      IF( JLEVEN.EQ.-1 )THEN                                                    
+        CALL LBSIGG( LGNAMS(1), 6 )                                             
+        JLEVEN = 0                                                              
+        RETURN                                                                  
+      ENDIF                                                                     
+* ******************************************************                        
+*  Handle the events                              ******                        
+* ******************************************************                        
+* *> Increment event counter and stop printing after 50 events                  
+      JLEVEN = JLEVEN + 1                                                       
+      IF ( KPRINT ) THEN                                                        
+        WRITE(6,*)'************************************************'            
+        WRITE(6,*)'*****      Event #  ',JLEVEN,'           *****'              
+        WRITE(6,*)'************************************************'            
+        IF ( MCFLAG ) THEN                                                      
+          CALL GPKINE(0)                                                        
+        ENDIF                                                                   
+CCCC    IF ( JLEVEN .EQ. 50 ) THEN                                              
+C         KPRINT = .FALSE.                                                      
+CCCC    ENDIF                                                                   
+      ENDIF                                                                     
+*                                                                               
+      CALL K0VFIN                                                               
+*                                                                               
+* *> Write the event                                                            
+* *> That's it                                                                  
+      END                                                                       
++DECK, MYOUT. Routine called after reading is finished                          
+*                                                                               
+* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX                     
+*                                                                               
+      SUBROUTINE MYOUT(IRUN)                                                    
+* *> Pick up my +KEEPs                                                          
++CDE,MYCOUN.                                                                    
+* *> Print number of events                                                     
+      WRITE(6,*)' Number of events = ',JLEVEN                                   
+      WRITE(6,*)' ***************************'                                  
+* *> Finish GEANT                                                               
+      CALL GLAST                                                                
+* *> Output Histograms                                                          
+      CALL K0OUT                                                                
+* *> That's it                                                                  
+      END                                                                       
++DECK, MYEOF. Routine called after each end of file on input                    
+*                                                                               
+* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX                     
+*                                                                               
+      SUBROUTINE MYEOF(NUNITS)                                                  
+* *> Pick up my +KEEPs                                                          
++CDE,MYCOUN.                                                                    
+* *> That's it                                                                  
+      END                                                                       
+*                                                                               
+*****************************************************************               
+*                                                                               
++DECK,K0CON1.                                                                   
+C                                                                               
+       SUBROUTINE K0CON1                                                        
+C                                                                               
+C----------------------------------------------                                 
+C  Evaluate the constraint functions and their                                  
+C  derivatives,                                                                 
+C  for a fit with geometry and momentum,                                        
+C for particles having passed both DC's                                         
+C----------------------------------------------                                 
+C                                                                               
++CDE,K0MDIM1.                                                                   
++CDE,K0GLSQCM.                                                                  
++CDE,K0MASSES.                                                                  
+C---------------------------------------------                                  
+C    VM(1) = KX1                                                                
+C      (2) = MX1                                                                
+C      (3) = KY1                                                                
+C      (4) = MY1                                                                
+C    VM(5) = KX2                                                                
+C      (6) = MX2                                                                
+C      (7) = KY2                                                                
+C      (8) = MY2                                                                
+C    VM(9) = XV0                                                                
+C     (10) = YV0                                                                
+C     (11) = ZV0                                                                
+C   VM(12) = PX1                                                                
+C     (13) = PY1                                                                
+C     (14) = PZ1                                                                
+C     (15) = PX2                                                                
+C     (16) = PY2                                                                
+C     (17) = PZ2                                                                
+C                                                                               
+C    VU(1) = XV                                                                 
+C      (2) = YV                                                                 
+C      (3) = ZV                                                                 
+C    VU(4) = PX0                                                                
+C      (5) = PX1                                                                
+C      (6) = PX2                                                                
+C                                                                               
+C     Tracks through vertex :                                                   
+C                                                                               
+C    FCON(1) = KX1*ZV + MX1 - XV = 0                                            
+C    FCON(2) = KY1*ZV + MY1 - YV = 0                                            
+C    FCON(3) = KX2*ZV + MX2 - XV = 0                                            
+C    FCON(4) = KY2*Z  + MY2 - YV = 0                                            
+C                                                                               
+C      Coplanarity :                                                            
+C                                                                               
+C              |                       |                                        
+C              |  KX1    KY1      1    |                                        
+C              |                       |                                        
+C    FCON(5) = |  KX2    KY2      1    |                                        
+C              |                       |                                        
+C              | XV-X0  YV-Y0   ZV-Z0  |                                        
+C              |                       |                                        
+C                                                                               
+C      Momentum conservation :                                                  
+C                                                                               
+C    FCON(6)  = PX0 - PX1 - PX2 = 0                                             
+C    FCON(7)  = PY0 - PY1 - PY2 = 0                                             
+C    FCON(8)  = PZ0 - PZ1 - PZ2 = 0                                             
+C                                                                               
+C      Momentum and trajectory of K0 collinear :                                
+C                                                                               
+C    FCON( 9) = PX0*(ZV-Z0) - PZ0*(XV-X0) = 0                                   
+C    FCON(10) = PY0*(ZV-Z0) - PZ0*(YV-Y0) = 0                                   
+C                                                                               
+C [    Energy conservation ( active if MASFIT true ) :                          
+C [ OUT-COMMENTED ! ]                                                           
+C [  FCON(11) = SQRT(P1*P1+M1*M1) +SQRT(P2*P2+M2*M2) -SQRT(P0*P0+M0*M0)         
+C                                                                               
+C------------------------------------------------                               
+C                                                                               
+       FCON(1) = ETA(1)*VU(3) + ETA(2) - VU(1)                                  
+       FCON(2) = ETA(3)*VU(3) + ETA(4) - VU(2)                                  
+       FCON(3) = ETA(5)*VU(3) + ETA(6) - VU(1)                                  
+       FCON(4) = ETA(7)*VU(3) + ETA(8) - VU(2)                                  
+C                                                                               
+       FCON(5) = ETA(1)*ETA(7)*(VU(3)-ETA(11))                                  
+     *         + ETA(3)      *(VU(1)-ETA( 9))                                   
+     *         + ETA(5)      *(VU(2)-ETA(10))                                   
+     *         - ETA(1)      *(VU(2)-ETA(10))                                   
+     *         - ETA(3)*ETA(5)*(VU(3)-ETA(11))                                  
+     *         - ETA(7)      *(VU(1)-ETA( 9))                                   
+C                                                                               
+       FCON(6) = VU(4) - ETA(12) - ETA(15)                                      
+       FCON(7) = VU(5) - ETA(13) - ETA(16)                                      
+       FCON(8) = VU(6) - ETA(14) - ETA(17)                                      
+C                                                                               
+       FCON( 9) = VU(4)*(VU(3)-ETA(11)) - VU(6)*(VU(1)-ETA( 9))                 
+       FCON(10) = VU(5)*(VU(3)-ETA(11)) - VU(6)*(VU(2)-ETA(10))                 
+C                                                                               
+CCCC   IF ( MASFIT ) THEN                                                       
+C        P0SQR = VU(4)*VU(4)     + VU(5)*VU(5)    + VU(6)*VU(6)                 
+C        P1SQR = ETA(12)*ETA(12) +ETA(13)*ETA(13) +ETA(14)*ETA(14)              
+C        P2SQR = ETA(15)*ETA(15) +ETA(16)*ETA(16) +ETA(17)*ETA(17)              
+C        FCON(11) = SQRT(P1SQR+WM1*WM1) + SQRT(P2SQR+WM2*WM2)                   
+C    *            - SQRT(P0SQR+WM0*WM0)                                         
+C      ELSE                                                                     
+C        FCON(11) = 0                                                           
+CCCC   ENDIF                                                                    
+C                                                                               
+C-----------------------------------------------                                
+C   dFcon/dVM :                                                                 
+C-----------------------------------------------                                
+C                                                                               
+       CALL VZERO(DFDM,NFCON*NVM)                                               
+C                                                                               
+       DFDM(1,1) = VU(3)                                                        
+       DFDM(1,2) = 1.                                                           
+C                                                                               
+       DFDM(2,3) = VU(3)                                                        
+       DFDM(2,4) = 1.                                                           
+C                                                                               
+       DFDM(3,5) = VU(3)                                                        
+       DFDM(3,6) = 1.                                                           
+C                                                                               
+       DFDM(4,7) = VU(3)                                                        
+       DFDM(4,8) = 1.                                                           
+C                                                                               
+       DFDM(5,1) =  ETA(7)*(VU(3)-ETA(11)) - (VU(2)-ETA(10))                    
+       DFDM(5,3) = -ETA(5)*(VU(3)-ETA(11)) + (VU(1)-ETA( 9))                    
+       DFDM(5,5) = -ETA(3)*(VU(3)-ETA(11)) + (VU(2)-ETA(10))                    
+       DFDM(5,7) =  ETA(1)*(VU(3)-ETA(11)) - (VU(1)-ETA( 9))                    
+       DFDM(5,9) =  ETA(7)-ETA(3)                                               
+       DFDM(5,10)=  ETA(1)-ETA(5)                                               
+       DFDM(5,11)=  ETA(3)*ETA(5) - ETA(1)*ETA(7)                               
+C                                                                               
+       DFDM(6,12) = -1.                                                         
+       DFDM(6,15) = -1.                                                         
+C                                                                               
+       DFDM(7,13) = -1.                                                         
+       DFDM(7,16) = -1.                                                         
+C                                                                               
+       DFDM(8,14) = -1.                                                         
+       DFDM(8,17) = -1.                                                         
+C                                                                               
+       DFDM( 9, 9) =  VU(6)                                                     
+       DFDM( 9,11) = -VU(4)                                                     
+C                                                                               
+       DFDM(10,10) =  VU(6)                                                     
+       DFDM(10,11) = -VU(5)                                                     
+C                                                                               
+CCCC   IF ( MASFIT ) THEN                                                       
+C        SQI = 1.0/SQRT(P1SQR+WM1*WM1)                                          
+C        DFDM(11,12) = ETA(12)*SQI                                              
+C        DFDM(11,13) = ETA(13)                                                  
+C        DFDM(11,14) = ETA(14)                                                  
+C                                                                               
+C        SQI = 1.0/SQRT(P2SQR+WM2*WM2)                                          
+C        DFDM(11,15) = ETA(15)*SQI                                              
+C        DFDM(11,16) = ETA(16)*SQI                                              
+C        DFDM(11,17) = ETA(17)*SQI                                              
+CCCC   ENDIF                                                                    
+C                                                                               
+C-----------------------------------------------                                
+C   dFcon/dVU :                                                                 
+C-----------------------------------------------                                
+C                                                                               
+       CALL VZERO(DFDU,NFCON*NVU)                                               
+C                                                                               
+       DFDU(1,1) = -1.                                                          
+       DFDU(1,3) = ETA(1)                                                       
+       DFDU(2,2) = -1.                                                          
+       DFDU(2,3) = ETA(3)                                                       
+       DFDU(3,1) = -1.                                                          
+       DFDU(3,3) = ETA(5)                                                       
+       DFDU(4,2) = -1.                                                          
+       DFDU(4,3) = ETA(7)                                                       
+C                                                                               
+       DFDU(5,1) =  ETA(3)-ETA(7)                                               
+       DFDU(5,2) =  ETA(5)-ETA(1)                                               
+       DFDU(5,3) =  ETA(1)*ETA(7) - ETA(3)*ETA(5)                               
+C                                                                               
+       DFDU(6,4) = 1.                                                           
+       DFDU(7,5) = 1.                                                           
+       DFDU(8,6) = 1.                                                           
+C                                                                               
+       DFDU( 9,1) = -VU(6)                                                      
+       DFDU( 9,3) =  VU(4)                                                      
+       DFDU( 9,4) =  VU(3)-ETA(11)                                              
+       DFDU( 9,6) =  ETA(9)-VU(1)                                               
+C                                                                               
+       DFDU(10,2) = -VU(6)                                                      
+       DFDU(10,3) =  VU(5)                                                      
+       DFDU(10,5) =  VU(3)-ETA(11)                                              
+       DFDU(10,6) =  ETA(1)-VU(2)                                               
+C                                                                               
+CCCC   IF ( MASFIT ) THEN                                                       
+C        SQI = 1/SQRT(P0SQR+WM0*WM0)                                            
+C        DFDU(11,4) = VU(4)                                                     
+C        DFDU(11,5) = VU(5)                                                     
+C        DFDU(11,6) = VU(6)                                                     
+CCCC   ENDIF                                                                    
+C                                                                               
+       RETURN                                                                   
+       END                                                                      
+C                                                                               
+C***********************************************************************        
+C                                                                               
++DECK,K0CON2.                                                                   
+C                                                                               
+       SUBROUTINE K0CON2                                                        
+C                                                                               
+C----------------------------------------------                                 
+C  Evaluate the constraint functions and their                                  
+C  derivatives,                                                                 
+C  for a fit with geometry and momentum,                                        
+C for particles having passed only DC1  .OR. only DC3                           
+C----------------------------------------------                                 
+C                                                                               
++CDE,K0MDIM2.                                                                   
++CDE,K0GLSQCM.                                                                  
++CDE,K0MASSES.                                                                  
+C                                                                               
+       RETURN                                                                   
+       END                                                                      
+C                                                                               
+C***********************************************************************        
+C                                                                               
++DECK,K0CON3.                                                                   
+C                                                                               
+       SUBROUTINE K0CON3                                                        
+C                                                                               
+C----------------------------------------------                                 
+C  Evaluate the constraint functions and their                                  
+C  derivatives,                                                                 
+C  for a fit with geometry and momentum,                                        
+C for particles having passed only DC1  .OR. only DC3                           
+C----------------------------------------------                                 
+C                                                                               
++CDE,K0MDIM3.                                                                   
++CDE,K0GLSQCM.                                                                  
++CDE,K0MASSES.                                                                  
+C---------------------------------------------                                  
+C    VM(1) = KX1                                                                
+C      (2) = MX1                                                                
+C      (3) = KY1                                                                
+C      (4) = MY1                                                                
+C    VM(5) = KX2                                                                
+C      (6) = MX2                                                                
+C      (7) = KY2                                                                
+C      (8) = MY2                                                                
+C    VM(9) = XV0                                                                
+C     (10) = YV0                                                                
+C     (11) = ZV0                                                                
+C                                                                               
+C    VU(1) = XV                                                                 
+C      (2) = YV                                                                 
+C      (3) = ZV                                                                 
+C                                                                               
+C     Tracks through vertex :                                                   
+C                                                                               
+C    FCON(1) = KX1*ZV + MX1 - XV = 0                                            
+C    FCON(2) = KY1*ZV + MY1 - YV = 0                                            
+C    FCON(3) = KX2*ZV + MX2 - XV = 0                                            
+C    FCON(4) = KY2*ZV + MY2 - YV = 0                                            
+C                                                                               
+C      Coplanarity :                                                            
+C                                                                               
+C              |                       |                                        
+C              |  KX1    KY1      1    |                                        
+C              |                       |                                        
+C    FCON(5) = |  KX2    KY2      1    |                                        
+C              |                       |                                        
+C              | XV-X0  YV-Y0   ZV-Z0  |                                        
+C              |                       |                                        
+C                                                                               
+C                                                                               
+C------------------------------------------------                               
+C                                                                               
+       FCON(1) = ETA(1)*VU(3) + ETA(2) - VU(1)                                  
+       FCON(2) = ETA(3)*VU(3) + ETA(4) - VU(2)                                  
+       FCON(3) = ETA(5)*VU(3) + ETA(6) - VU(1)                                  
+       FCON(4) = ETA(7)*VU(3) + ETA(8) - VU(2)                                  
+C                                                                               
+       FCON(5) = ETA(1)*ETA(7)*(VU(3)-ETA(11))                                  
+     *         + ETA(3)      *(VU(1)-ETA( 9))                                   
+     *         + ETA(5)      *(VU(2)-ETA(10))                                   
+     *         - ETA(1)      *(VU(2)-ETA(10))                                   
+     *         - ETA(3)*ETA(5)*(VU(3)-ETA(11))                                  
+     *         - ETA(7)      *(VU(1)-ETA( 9))                                   
+C                                                                               
+C-----------------------------------------------                                
+C   dFcon/dVM :                                                                 
+C-----------------------------------------------                                
+C                                                                               
+       CALL VZERO(DFDM,NFCON*NVM)                                               
+C                                                                               
+       DFDM(1,1) = VU(3)                                                        
+       DFDM(1,2) = 1.                                                           
+C                                                                               
+       DFDM(2,3) = VU(3)                                                        
+       DFDM(2,4) = 1.                                                           
+C                                                                               
+       DFDM(3,5) = VU(3)                                                        
+       DFDM(3,6) = 1.                                                           
+C                                                                               
+       DFDM(4,7) = VU(3)                                                        
+       DFDM(4,8) = 1.                                                           
+C                                                                               
+       DFDM(5,1) =  ETA(7)*(VU(3)-ETA(11)) - (VU(2)-ETA(10))                    
+       DFDM(5,3) = -ETA(5)*(VU(3)-ETA(11)) + (VU(1)-ETA( 9))                    
+       DFDM(5,5) = -ETA(3)*(VU(3)-ETA(11)) + (VU(2)-ETA(10))                    
+       DFDM(5,7) =  ETA(1)*(VU(3)-ETA(11)) - (VU(1)-ETA( 9))                    
+       DFDM(5,9) =  ETA(7)-ETA(3)                                               
+       DFDM(5,10)=  ETA(1)-ETA(5)                                               
+       DFDM(5,11)=  ETA(3)*ETA(5) - ETA(1)*ETA(7)                               
+C                                                                               
+C-----------------------------------------------                                
+C   dFcon/dVU :                                                                 
+C-----------------------------------------------                                
+C                                                                               
+       CALL VZERO(DFDU,NFCON*NVU)                                               
+C                                                                               
+       DFDU(1,1) = -1.                                                          
+       DFDU(1,3) = ETA(1)                                                       
+       DFDU(2,2) = -1.                                                          
+       DFDU(2,3) = ETA(3)                                                       
+       DFDU(3,1) = -1.                                                          
+       DFDU(3,3) = ETA(5)                                                       
+       DFDU(4,2) = -1.                                                          
+       DFDU(4,3) = ETA(7)                                                       
+C                                                                               
+       DFDU(5,1) =  ETA(3)-ETA(7)                                               
+       DFDU(5,2) =  ETA(5)-ETA(1)                                               
+       DFDU(5,3) =  ETA(1)*ETA(7) - ETA(3)*ETA(5)                               
+C                                                                               
+       RETURN                                                                   
+       END                                                                      
+C                                                                               
+C************************************************************                   
+C                                                                               
++DECK,K0CON4.                                                                   
+C                                                                               
+       SUBROUTINE K0CON4                                                        
+C                                                                               
+C----------------------------------------------                                 
+C  Evaluate the constraint functions and their                                  
+C  derivatives,                                                                 
+C  for a fit with geometry and momentum,                                        
+C  for particles decaying in the magnet.                                        
+C----------------------------------------------                                 
+C                                                                               
++CDE,K0MDIM4.                                                                   
++CDE,K0GLSQCM.                                                                  
++CDE,K0MASSES.                                                                  
++CDE,K0PARDIM.                                                                  
++CDE,K04COM.                                                                    
++CDE,K0COM.                                                                     
+C                                                                               
+C---------------------------------------------                                  
+C    VM(1) = KX1B = THETA1                                                      
+C      (2) = MX1B = X1                                                          
+C      (3) = KY1  = PHI1                                                        
+C      (4) = MY1  = Y1                                                          
+C    VM(5) = KX2B = THETA2                                                      
+C      (6) = MX2B = X2                                                          
+C      (7) = KY2  = PHI2                                                        
+C      (8) = MY2  = Y2                                                          
+C      (9) = YV                                                                 
+C     (10) = ZV                                                                 
+C                                                                               
+C    VU(1) = XV                                                                 
+C      (2) = PZ                                                                 
+C      (3) = QZ                                                                 
+C                                                                               
+C----------------------------------------------------------------               
+C                                                                               
+C    FCON(1) = ZV*PHI1 + Y1 - YV                                                
+C    FCON(2) = ZV*PHI2 + Y2 - YV                                                
+C                                                                               
+C    L = EMAG-ZV                                                                
+C    ZM = (EMAG+ZV)/2                                                           
+C    DTHE1 =   3*B*L/(4*PZ*SQRT(THETA1*THETA1+1))                               
+C    DTHE2 = - 3*B*L/(4*QZ*SQRT(THETA2*THETA2+1))                               
+C                                                                               
+C    FCON(3) = ZV*(THETA1+DTHE1) - ZM*DTHE1 - XV + X1                           
+C    FCON(4) = ZV*(THETA2+DTHE2) - ZM*DTHE2 - XV + X2                           
+C                                                                               
+C    FCON(5) = (ZV-ZP)*(PZ*(THETA1+DTHE1)+QZ*(THETA2+DTHE2)) - XV*(PZ+QZ        
+C                                                                               
+C    FCON(6) = (ZV-ZP)*(PZ*PHI1+QZ*PHI2) - YV*(PZ+QZ)                           
+C                                                                               
+C    E1 = PZ*PZ*((THETA1+DTHE1)**2 + PHI1*PHI1 + 1)                             
+C    E2 = QZ*QZ*((THETA2+DTHE2)**2 + PHI2*PHI2 + 1)                             
+C                                                                               
+C    FCON(7) = WM1*WM1 + WM2*WM2 - WM0*WM0 + 2*E1*E2                            
+C            -2*PZ*QZ*((THETA1+DTHE1)*(THETA2+DTHE2)+PHI1*PHI2+1)               
+C                                                                               
+C----------------------------------------------------------------               
+C                                                                               
+       LOGICAL DEBUG                                                            
+       DATA DEBUG/.FALSE./                                                      
+C                                                                               
+       FCON(1) = ETA(10)*ETA(3) + ETA(4) - ETA(9)                               
+       FCON(2) = ETA(10)*ETA(7) + ETA(8) - ETA(9)                               
+C                                                                               
+       L     = EMAG-ETA(10)                                                     
+       ZM    = (EMAG+ETA(10))/2                                                 
+       DTHE1 =   3.E-3*FLDMAG*L/(VU(2)*SQRT(ETA(1)*ETA(1)+1))                   
+       DTHE2 = - 3.E-3*FLDMAG*L/(VU(3)*SQRT(ETA(5)*ETA(5)+1))                   
+       THE01 = ETA(1)+DTHE1                                                     
+       THE02 = ETA(5)+DTHE2                                                     
+C                                                                               
+       FCON(3) = ETA(10)*(ETA(1)+DTHE1) - ZM*DTHE1 - VU(1) + ETA(2)             
+       FCON(4) = ETA(10)*(ETA(5)+DTHE2) - ZM*DTHE2 - VU(1) + ETA(6)             
+C                                                                               
+       FCON(5) = (ETA(10)-ZPRIM)*(VU(2)*(ETA(1)+DTHE1)                          
+     *         + VU(3)*(ETA(5)+DTHE2)) - VU(1)*(VU(2)+VU(3))                    
+C                                                                               
+       FCON(6) = (ETA(10)-ZPRIM)*(VU(2)*ETA(3)+VU(3)*ETA(7))                    
+     *          - ETA(9)*(VU(2)+VU(3))                                          
+C                                                                               
+       E1 = SQRT(VU(2)*VU(2)*((ETA(1)+DTHE1)*(ETA(1)+DTHE1)                     
+     *    +ETA(3)*ETA(3)+1) + WM1*WM1)                                          
+       E2 = SQRT(VU(3)*VU(3)*((ETA(5)+DTHE2)*(ETA(5)+DTHE2)                     
+     *    +ETA(7)*ETA(7)+1) + WM2*WM2)                                          
+C                                                                               
+       FCON(7) = WM1*WM1 +WM2*WM2 -WM0*WM0 +2*E1*E2 -2*VU(2)*VU(3)              
+     *         *((ETA(1)+DTHE1)*(ETA(5)+DTHE2) + ETA(3)*ETA(7) + 1)             
+C                                                                               
+C                                                                               
+C----------------------------------------------------------------               
+C                                                                               
+       DO 23 I=1,NVM                                                            
+         DO 24 J=1,NFCON                                                        
+           DFDM(J,I) = 0.0                                                      
+ 24      CONTINUE                                                               
+ 23    CONTINUE                                                                 
+C                                                                               
+       DFDM(1,3) = ETA(10)                                                      
+       DFDM(1,4) = 1.                                                           
+       DFDM(1,9) = -1.                                                          
+       DFDM(1,10) = ETA(3)                                                      
+C                                                                               
+       DFDM(2,7) = ETA(10)                                                      
+       DFDM(2,8) = 1.                                                           
+       DFDM(2,9) = -1.                                                          
+       DFDM(2,10) = ETA(7)                                                      
+C                                                                               
+       DDT1D0 = - 3.E-3*FLDMAG/(VU(2)*SQRT(ETA(1)*ETA(1)+1))                    
+       DDT2D0 =   3.E-3*FLDMAG/(VU(3)*SQRT(ETA(5)*ETA(5)+1))                    
+C                                                                               
+       DDT1D1 = -ETA(1)*DTHE1/(ETA(1)*ETA(1)+1)                                 
+       DDT2D5 =  ETA(5)*DTHE2/(ETA(5)*ETA(5)+1)                                 
+C                                                                               
+       DFDM(3,1) = ETA(10)*(1+DDT1D1) - ZM*DDT1D1                               
+       DFDM(3,2) = 1.                                                           
+       DFDM(3,10)= (ETA(1)+0.5*DTHE1) + (ZM+ETA(10))*DDT1D0                     
+C                                                                               
+       DFDM(4,5) = ETA(10)*(1+DDT2D5) - ZM*DDT2D5                               
+       DFDM(4,6) = 1.                                                           
+       DFDM(4,10)= (ETA(5)+0.5*DTHE2) + (ZM+ETA(10))*DDT2D0                     
+C                                                                               
+       DFDM(5,1) = (ETA(10)-ZPRIM)*VU(2)*(1+DDT1D1)                             
+       DFDM(5,5) = (ETA(10)-ZPRIM)*VU(3)*(1+DDT2D5)                             
+       DFDM(5,10) = VU(2)*(ETA(1)+DTHE1)+VU(3)*(ETA(5)+DTHE2)                   
+     *           + (ETA(10)-ZPRIM)*(VU(2)*DDT1D0+VU(3)*DDT2D0)                  
+C                                                                               
+       DFDM(6,3) = (ETA(10)-ZPRIM)*VU(2)                                        
+       DFDM(6,7) = (ETA(10)-ZPRIM)*VU(3)                                        
+       DFDM(6,9) = -(VU(2)+VU(3))                                               
+       DFDM(6,10) = VU(2)*ETA(3) + VU(3)*ETA(7)                                 
+C                                                                               
+       DE1DE1 = VU(2)*VU(2)*(1+DDT1D1)*(ETA(1)+DTHE1)/E1                        
+       DE1DE3 = VU(2)*VU(2)*ETA(3)/E1                                           
+       DE1D10 = DDT1D0*VU(2)*VU(2)*(ETA(1)+DTHE1)/E1                            
+C                                                                               
+       DE2DE5 = VU(3)*VU(3)*(1+DDT2D5)*(ETA(5)+DTHE2)/E2                        
+       DE2DE7 = VU(3)*VU(3)*ETA(7)/E2                                           
+       DE2D10 = DDT2D0*VU(3)*VU(3)*(ETA(5)+DTHE2)/E2                            
+C                                                                               
+       DFDM(7,1) = 2*E2*DE1DE1-2*VU(2)*VU(3)*(1+DDT1D1)*(ETA(5)+DTHE2)          
+       DFDM(7,3) = 2*E2*DE1DE3-2*VU(2)*VU(3)*ETA(7)                             
+       DFDM(7,5) = 2*E1*DE2DE5-2*VU(2)*VU(3)*(ETA(1)+DTHE1)*(1+DDT2D5)          
+       DFDM(7,7) = 2*E1*DE2DE7-2*VU(2)*VU(3)*ETA(3)                             
+       DFDM(7,10) = 2*E1*DE2D10 + 2*DE1D10*E2 - 2*VU(2)*VU(3)                   
+     *           *(DDT1D0*(ETA(5)+DTHE2) + DDT2D0*(ETA(1)+DTHE1))               
+C                                                                               
+C--------------------------------------------------------------------           
+C                                                                               
+CCC    CALL DVSET(NFCON*NVU,0.0,DFDU(1,1),DFDU(2,1))                            
+       DO 33 I=1,NVU                                                            
+         DO 34 J=1,NFCON                                                        
+           DFDU(J,I) = 0.0                                                      
+ 34      CONTINUE                                                               
+ 33    CONTINUE                                                                 
+C                                                                               
+       DDT1D2 = -DTHE1/VU(2)                                                    
+       DDT2D3 = -DTHE2/VU(3)                                                    
+C                                                                               
+       DFDU(3,1) = -1.                                                          
+       DFDU(3,2) = (ETA(10)-ZM)*DDT1D2                                          
+C                                                                               
+       DFDU(4,1) = -1.                                                          
+       DFDU(4,3) = (ETA(10)-ZM)*DDT2D3                                          
+C                                                                               
+       DFDU(5,1) = -(VU(2)+VU(3))                                               
+       DFDU(5,2) = (ETA(10)+ZPRIM)*((ETA(1)+DTHE1)+VU(2)*DDT1D2)-VU(1)          
+       DFDU(5,3) = (ETA(10)+ZPRIM)*((ETA(5)+DTHE2)+VU(3)*DDT2D3)-VU(1)          
+C                                                                               
+       DFDU(6,2) = (ETA(10)+ZPRIM)*ETA(3) - ETA(9)                              
+       DFDU(6,3) = (ETA(10)+ZPRIM)*ETA(7) - ETA(9)                              
+C                                                                               
+       DE1DU2 = (VU(2)*((ETA(1)+DTHE1)*(ETA(1)+DTHE1)+ETA(3)*ETA(3)+1)          
+     *        + DDT1D2*VU(2)*VU(2)*(ETA(1)+DTHE1))/E1                           
+       DE2DU3 = (VU(3)*((ETA(5)+DTHE2)*(ETA(5)+DTHE2)+ETA(7)*ETA(7)+1)          
+     *        + DDT2D3*VU(3)*VU(3)*(ETA(5)+DTHE2))/E2                           
+C                                                                               
+       DFDU(7,2) = 2*DE1DU2*E2                                                  
+     *      -2*VU(3)*((ETA(1)+DTHE1)*(ETA(5)+DTHE2)+ ETA(3)*ETA(7) + 1)         
+     *      -2*VU(2)*VU(3)*DDT1D2*(ETA(5)+DTHE2)                                
+       DFDU(7,3) = 2*E1*DE2DU3                                                  
+     *      -2*VU(2)*((ETA(1)+DTHE1)*(ETA(5)+DTHE2)+ ETA(3)*ETA(7) + 1)         
+     *      -2*VU(2)*VU(3)*DDT2D3*(ETA(1)+DTHE1)                                
+C                                                                               
+C------------------------------------------------------------------             
+C                                                                               
+       IF ( DEBUG ) THEN                                                        
+         WRITE(6,*)' Constraints : '                                            
+         CALL K0PRM0(FCON,1,NFCON)                                              
+         WRITE(6,*)' DFDM : '                                                   
+         CALL K0PRM0(DFDM,NFCON,NVM)                                            
+         WRITE(6,*)' DFDU : '                                                   
+         CALL K0PRM0(DFDU,NFCON,NVU)                                            
+       ENDIF                                                                    
+C                                                                               
+       RETURN                                                                   
+       END                                                                      
+C                                                                               
+C***************************************************************                
++DECK,K0CON5.                                                                   
+       SUBROUTINE K0CON5                                                        
+C                                                                               
+C------------------------------------                                           
+C  Constraint functions for K0                                                  
+C  decaying before the magnet                                                   
+C  but without a full track in DC1.                                             
+C------------------------------------                                           
+C                                                                               
++CDE,K0MDIM5.                                                                   
++CDE,K0GLSQCM.                                                                  
++CDE,K0MASSES.                                                                  
++CDE,K0PARDIM.                                                                  
+C                                                                               
+C---------------------------------------------                                  
+C    VM(1) = KX1A = THETA1A                                                     
+C      (2) = MX1A = X1                                                          
+C      (3) = KY1  = PHI1                                                        
+C      (4) = MY1  = Y1                                                          
+C    VM(5) = KX2A = THETA2A                                                     
+C      (6) = MX2A = X2                                                          
+C      (7) = KY2  = PHI2                                                        
+C      (8) = MY2  = Y2                                                          
+C      (9) = X0                                                                 
+C     (10) = Y0                                                                 
+C     (11) = Z0                                                                 
+C     (12) = KX1B = THETA1B                                                     
+C     (13) = KX2B = THETA2B                                                     
+C     (14) = MX1B                                                               
+C     (15) = MX2B                                                               
+C                                                                               
+C    VU(1) = XV                                                                 
+C      (2) = YV                                                                 
+C      (3) = ZV                                                                 
+C      (4) = PZ                                                                 
+C      (5) = QZ                                                                 
+C                                                                               
+C----------------------------------------------------------------               
+C                                                                               
+C    FCON(1) = ZV*PHI1 + Y1 - YV                                                
+C    FCON(2) = ZV*PHI2 + Y2 - YV                                                
+C                                                                               
+C    FCON(3) = ZV*KX1A + MX1A - XV                                              
+C    FCON(4) = ZV*KX2A + MX2A - XV                                              
+C                                                                               
+C    FCON(5) = COPLANARITY                                                      
+C                                                                               
+C    FCON(6) = KX1A - KX1B + 3.E-3*FLDMAG*FLDLEN/(PZ1*SQRT(1+KX1A*KX1A))        
+C    FCON(7) = KX2A - KX2B + 3.E-3*FLDMAG*FLDLEN/(PZ2*SQRT(1+KX2A*KX2A))        
+C                                                                               
+C    FCON(8) = (XV-X0)*(PZ1+PZ2) - (ZV-Z0)*(KX1A*PZ1+KX2A*PZ2)                  
+C    FCON(9) = (YV-Y0)*(PZ1+PZ2) - (ZV-Z0)*(KY1 *PZ1+KY2 *PZ2)                  
+C                                                                               
+C    FCON(10)= CMAG*KX1A - CMAG*KX1B + MX1A - MX1B                              
+C    FCON(11)= CMAG*KX2A - CMAG*KX2B + MX2A - MX2B                              
+C                                                                               
+C----------------------------------------------------------------               
+C                                                                               
+       LOGICAL DEBUG                                                            
+       DATA DEBUG/.FALSE./                                                      
+C                                                                               
+       FCON(1) = VU(3)*ETA(3) + ETA(4) - VU(2)                                  
+       FCON(2) = VU(3)*ETA(7) + ETA(8) - VU(2)                                  
+C                                                                               
+       FCON(3) = VU(3)*ETA(1) + ETA(2) - VU(1)                                  
+       FCON(4) = VU(3)*ETA(5) + ETA(6) - VU(1)                                  
+C                                                                               
+       FCON(5) = ETA(1)*ETA(7)*(VU(3)-ETA(11))                                  
+     *         + ETA(3)      *(VU(1)-ETA( 9))                                   
+     *         + ETA(5)      *(VU(2)-ETA(10))                                   
+     *         - ETA(1)      *(VU(2)-ETA(10))                                   
+     *         - ETA(3)*ETA(5)*(VU(3)-ETA(11))                                  
+     *         - ETA(7)      *(VU(1)-ETA( 9))                                   
+C                                                                               
+       FCON(6) = (ETA(1)-ETA(12))*VU(4) + 3.E-3*FLDMAG*FLDLEN                   
+     *               /SQRT(1.+ETA(1)*ETA(1))                                    
+C                                                                               
+       FCON(7) = -(ETA(5)-ETA(13))*VU(5) + 3.E-3*FLDMAG*FLDLEN                  
+     *               /SQRT(1.+ETA(5)*ETA(5))                                    
+C                                                                               
+       FCON(8) = (VU(1)-ETA(9))*(VU(4)+VU(5))                                   
+     *               - (VU(3)-ETA(11))*(ETA(1)*VU(4)+ETA(5)*VU(5))              
+C                                                                               
+       FCON(9) = (VU(2)-ETA(10))*(VU(4)+VU(5))                                  
+     *               - (VU(3)-ETA(11))*(ETA(3)*VU(4)+ETA(7)*VU(5))              
+C                                                                               
+       FCON(10) = CMAG*ETA(1) - CMAG*ETA(12) + ETA(2) - ETA(14)                 
+       FCON(11) = CMAG*ETA(5) - CMAG*ETA(13) + ETA(6) - ETA(15)                 
+C                                                                               
+C----------------------------------------------------------------               
+C                                                                               
+       DO 23 I=1,NVM                                                            
+         DO 24 J=1,NFCON                                                        
+           DFDM(J,I) = 0.0                                                      
+ 24      CONTINUE                                                               
+ 23    CONTINUE                                                                 
+C                                                                               
+       DFDM(1,3) = VU(3)                                                        
+       DFDM(1,4) = 1.                                                           
+C                                                                               
+       DFDM(2,7) = VU(3)                                                        
+       DFDM(2,8) = 1.                                                           
+C                                                                               
+       DFDM(3,1) = VU(3)                                                        
+       DFDM(3,2) = 1.                                                           
+C                                                                               
+       DFDM(4,5) = VU(3)                                                        
+       DFDM(4,6) = 1.                                                           
+C                                                                               
+       DFDM(5,1) =  ETA(7)*(VU(3)-ETA(11)) - (VU(2)-ETA(10))                    
+       DFDM(5,3) = -ETA(5)*(VU(3)-ETA(11)) + (VU(1)-ETA( 9))                    
+       DFDM(5,5) = -ETA(3)*(VU(3)-ETA(11)) + (VU(2)-ETA(10))                    
+       DFDM(5,7) =  ETA(1)*(VU(3)-ETA(11)) - (VU(1)-ETA( 9))                    
+       DFDM(5,9) =  ETA(7)-ETA(3)                                               
+       DFDM(5,10)=  ETA(1)-ETA(5)                                               
+       DFDM(5,11)=  ETA(3)*ETA(5) - ETA(1)*ETA(7)                               
+C                                                                               
+       DFDM(6,1) = VU(4) + 6.E-3*FLDMAG*FLDLEN*ETA(1)                           
+     *                       /(1.+ETA(1)*ETA(1))**1.5                           
+       DFDM(6,12) = -VU(4)                                                      
+C                                                                               
+       DFDM(7,5) = -VU(5) + 6.E-3*FLDMAG*FLDLEN*ETA(5)                          
+     *                       /(1.+ETA(5)*ETA(5))**1.5                           
+       DFDM(7,13) = VU(5)                                                       
+C                                                                               
+       DFDM(8,1) = -(VU(3)-ETA(11))*VU(4)                                       
+       DFDM(8,5) = -(VU(3)-ETA(11))*VU(5)                                       
+       DFDM(8,9) = -(VU(4)+VU(5))                                               
+       DFDM(8,11) = ETA(1)*VU(4)+ETA(5)*VU(5)                                   
+C                                                                               
+       DFDM(9,3) = -(VU(3)-ETA(11))*VU(4)                                       
+       DFDM(9,7) = -(VU(3)-ETA(11))*VU(5)                                       
+       DFDM(9,10)= -(VU(4)+VU(5))                                               
+       DFDM(9,11) = ETA(3)*VU(4)+ETA(7)*VU(5)                                   
+C                                                                               
+       DFDM(10,1) = CMAG                                                        
+       DFDM(10,2) = 1.                                                          
+       DFDM(10,12) = -CMAG                                                      
+       DFDM(10,14) = -1.                                                        
+C                                                                               
+       DFDM(11,5) = CMAG                                                        
+       DFDM(11,6) = 1.                                                          
+       DFDM(11,13) = -CMAG                                                      
+       DFDM(11,15) = -1.                                                        
+C                                                                               
+C--------------------------------------------------------------------           
+C                                                                               
+       DO 33 I=1,NVU                                                            
+         DO 34 J=1,NFCON                                                        
+           DFDU(J,I) = 0.0                                                      
+ 34      CONTINUE                                                               
+ 33    CONTINUE                                                                 
+C                                                                               
+       DFDU(1,2) = -1.                                                          
+       DFDU(1,3) = ETA(3)                                                       
+C                                                                               
+       DFDU(2,2) = -1.                                                          
+       DFDU(2,3) = ETA(7)                                                       
+C                                                                               
+       DFDU(3,1) = -1.                                                          
+       DFDU(3,3) = ETA(1)                                                       
+C                                                                               
+       DFDU(4,1) = -1.                                                          
+       DFDU(4,3) = ETA(5)                                                       
+C                                                                               
+       DFDU(5,1) =  ETA(3)-ETA(7)                                               
+       DFDU(5,2) =  ETA(5)-ETA(1)                                               
+       DFDU(5,3) =  ETA(1)*ETA(7) - ETA(3)*ETA(5)                               
+C                                                                               
+       DFDU(6,4) = ETA(1)-ETA(12)                                               
+C                                                                               
+       DFDU(7,5) = -(ETA(5)-ETA(13))                                            
+C                                                                               
+       DFDU(8,1) = VU(4)+VU(5)                                                  
+       DFDU(8,3) = -(ETA(1)*VU(4)+ETA(5)*VU(5))                                 
+       DFDU(8,4) = VU(1)-ETA(9) -ETA(1)*(VU(3)-ETA(11))                         
+       DFDU(8,5) = VU(1)-ETA(9) -ETA(5)*(VU(3)-ETA(11))                         
+C                                                                               
+       DFDU(9,2) = VU(4)+VU(5)                                                  
+       DFDU(9,3) = -(ETA(3)*VU(4)+ETA(7)*VU(5))                                 
+       DFDU(9,4) = VU(2)-ETA(9) -ETA(3)*(VU(3)-ETA(11))                         
+       DFDU(9,5) = VU(2)-ETA(9) -ETA(7)*(VU(3)-ETA(11))                         
+C                                                                               
+       RETURN                                                                   
+       END                                                                      
+C                                                                               
+C***************************************************************                
++DECK,K0CON6.                                                                   
+       SUBROUTINE K0CON6                                                        
+C                                                                               
+C-------------------------------------                                          
+C  Constraint functions for K0                                                  
+C  decaying after the magnet;                                                   
+C  identical with K0CON3                                                        
+C------------------------------------                                           
+C                                                                               
+       CALL K0CON3                                                              
+C                                                                               
+       RETURN                                                                   
+       END                                                                      
+C                                                                               
+C****************************************************************               
+C                                                                               
++DECK,K0CUTS.                                                                   
+*                                                                               
+       SUBROUTINE K0CUTS                                                        
+**************************************************                              
+*   Fills the common block K0CUTC with the various                              
+*   cut values applied to the V0 :s                                             
+**************************************************                              
+*                                                                               
++CDE,K0COM.                                                                     
+C                                                                               
+*     (** cut on vertex pointing for "primary" tracks. **)                      
+      VRTCUT = 0.8                                                              
+*     (** cut on vertex pointing for secondary vertices. **)                    
+      VCUT2  = 3.0                                                              
+*     (** cut on mass fit **)                                                   
+      CUTMAS = 0.100                                                            
+*                                                                               
+*     (** Chi-2 cuts for different reconstr.types : **)                         
+      CHICUT(1) = 1.0                                                           
+      CHICUT(2) = 1.0                                                           
+      CHICUT(3) = 1.0                                                           
+      CHICUT(4) = 7.                                                            
+      CHICUT(5) = 7.                                                            
+      CHICUT(6) = 1.                                                            
+C                                                                               
+      OPANGC = 0.04                                                             
+      PANGC  = 0.005                                                            
+      PPIANG = 0.1                                                              
+      ANGPPR = 0.3E-3                                                           
+C                                                                               
+C     (** Vertices with z < zvmin assumed to come **)                           
+C     (** from target, and are thrown away.       **)                           
+      ZVMIN = 4.0                                                               
+C                                                                               
+       RETURN                                                                   
+       END                                                                      
+C                                                                               
+C****************************************************************               
+C                                                                               
++DECK,K0FILL.                                                                   
+*                                                                               
+       SUBROUTINE K0FILL                                                        
+**************************************************                              
+*  Fills histograms with all the vertices                                       
+*  from K0-decay.                                                               
+**************************************************                              
+*                                                                               
++CDE,GCBANK.                                                                    
++CDE,GCNUM.                                                                     
++CDE,K0COM.                                                                     
+*                                                                               
+       DIMENSION VERT(3),VV(3),PVERT(4),UBUF(10)                                
+*                                                                               
+       IF ( .NOT. MCFLAG ) THEN                                                 
+*        ******                                                                 
+         RETURN                                                                 
+*        ******                                                                 
+       ENDIF                                                                    
+*----------------------------------                                             
+       DO 10 I = 2,NVERTX                                                       
+         CALL K0FVRT(I,VERT,NTBEAM,NTTARG,NTRAK,UBUF)                           
+         CALL GFKINE(NTBEAM,VV,PVERT,IPART,NVERT,UBUF,NUBUF)                    
+         IF ( K0IFV0(IPART)) THEN                                               
+           CALL HFILL(4,VERT(3),0,1.)                                           
+         ENDIF                                                                  
+ 10    CONTINUE                                                                 
+*                                                                               
+       DO 20 I=1,NTRACK                                                         
+         CALL GFKINE(I,VV,PVERT,IPART,NVERT,UBUF,NUBUF)                         
+         IF ( K0IFV0(IPART)) THEN                                               
+           CALL HFILL(38,PVERT(3),0,1.)                                         
+           PT = SQRT(PVERT(1)*PVERT(1) + PVERT(2)*PVERT(2))                     
+           CALL HFILL(92,PT,0.,1.)                                              
+           THETA = ATAN2(PT,PVERT(3))                                           
+           CALL HFILL(89,THETA,0.,1.)                                           
+           JK = LQ(JKINE-I)                                                     
+           NV2 = Q(JK+7)                                                        
+           IF ( NV2 .LE. 0 ) THEN                                               
+             IF ( THETA .GT. 0.1 ) THEN                                         
+               MUTSID = MUTSID + 1                                              
+             ELSE                                                               
+               MAFTER = MAFTER + 1                                              
+             ENDIF                                                              
+           ELSE                                                                 
+             IF ( MPAIR(I) .GT. 0 ) THEN                                        
+               IP = MPAIR(I)                                                    
+               IF ( FRECON(IP)) THEN                                            
+                 CALL HFILL(95,IPTYPE(IPAIR),0.,1.)                             
+                 MFREC = MFREC + 1                                              
+               ELSE                                                             
+                 CALL HFILL(96,IPTYPE(IPAIR),0.,1.)                             
+                 MNFREC = MNFREC + 1                                            
+               ENDIF                                                            
+             ELSE                                                               
+               MCLOSE = MCLOSE + 1                                              
+             ENDIF                                                              
+           ENDIF                                                                
+         ENDIF                                                                  
+ 20    CONTINUE                                                                 
+*                                                                               
+      RETURN                                                                    
+      END                                                                       
+*                                                                               
+****************************************************************                
+*                                                                               
++DECK,K0FVRT.                                                                   
+C                                                                               
+       SUBROUTINE K0FVRT(IVERT,VERT,NTBEAM,NTTARG,NTRAK,ITRAKS)                 
+C--------------------------------------------                                   
+C  This routine should have been                                                
+C  called GFVERT, and been in Geant.                                            
+C  It picks up data for Geant vertex NVERT                                      
+C--------------------------------------------                                   
+C                                                                               
++CDE,GCBANK.                                                                    
++CDE,GCNUM.                                                                     
+C                                                                               
+       DIMENSION VERT(3),ITRAKS(*)                                              
+C                                                                               
+       IF ((IVERT .GT. NVERTX ).OR.(IVERT .LE. 0 ))THEN                         
+         WRITE(6,*)'ERROR IN K0FVRT; invalid vertex # ',IVERT                   
+         RETURN                                                                 
+       ENDIF                                                                    
+       JV = LQ(JVERTX-IVERT)                                                    
+       IF ( JV .LE. 0 ) RETURN                                                  
+*                                                                               
+       DO 10 I=1,3                                                              
+         VERT(I) = Q(JV+I)                                                      
+ 10    CONTINUE                                                                 
+       NTBEAM = Q(JV+5)                                                         
+       NTTARG = Q(JV+6)                                                         
+       NTRAK  = Q(JV+7)                                                         
+       IF ( NTRAK .GT. 0 ) THEN                                                 
+         DO 20 I=1,NTRAK                                                        
+           ITRAKS(I) = Q(7+I)                                                   
+  20     CONTINUE                                                               
+       ENDIF                                                                    
+C                                                                               
+      RETURN                                                                    
+      END                                                                       
+C                                                                               
+C****************************************************************               
+C                                                                               
++DECK,K0GLS1.                                                                   
+       SUBROUTINE K0GLS1(CHI2)                                                  
+C                                                                               
+C---------------------------------------------------

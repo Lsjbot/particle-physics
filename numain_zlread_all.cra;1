@@ -1,0 +1,2819 @@
+C+USE,APOLLO.
+C+USE,VAX.
+C+USE,ALLIANT.
++USE,ALPHA_OSF.
++USE,GCDES.
++USE,COMDECKS.
++USE,NUKEEP.
++REP,P=NUKEEP,D=,C=35.
+      COMMON/NULINK/JZZH0,JZEZH,JZTZH,JZCPA,JZCP1,JZPMH
+     *      ,JZSDIR,JZSHLO,JZSHHI,JZLAST
++REP,P=NUKEEP,D=,C=38.
+     *      IOPMH,IOSDIR,IOSHHI,IOSHLO,IOLAST
++USE,NURNKP.
++USE,MYDECKS.
++SELF. ------------------ Compile the MAIN program: ------------------
++USE,P=NUMAIN,D=NUMAIN,T=EXE.
++SELF.
++EXE.
++ADD,P=NUMAIN,D=NUMAIN,C=254.
+         CALL HCDIR('//nusim/NTUPLE',' ')
+C+USE,MYPMAM.
+C            Use the special version of NUPMAM below.
++KEEP,MYCOUN.
+      COMMON /MYCOUN/ NTRGEV(5), NQ(100)
++KEEP,MYSHOC.
+      PARAMETER ( MAXQQ  = 5000.)
+      PARAMETER ( MAXTIM = 100.)
+      PARAMETER ( MAXPS  = 5000)
+      COMMON /MYSHOC/ XPRTRA(MAXPS), YPRTRA(MAXPS), ZPRTRA(MAXPS),
+     +                DXPTRA(MAXPS), DYPTRA(MAXPS), DZPTRA(MAXPS),
+     +                PEMAS1,PTOT1(MAXPS),PTOT2,IPS, IPSTRA,
+     +                ZSHMAX,ZDIST(MAXPS),ETOT1(MAXPS),tlench,
+     +                CHPHEV,DEGTHE(MAXQQ)
++KEEP,NUSHLC.
+      PARAMETER ( MXEBIN = 50 )
+      PARAMETER ( MXTBIN = 40 )
+      COMMON/NUSHLC/SHPHOT(MXEBIN,MXTBIN),SHT(MXEBIN,MXTBIN)
+     *             ,SHT2(MXEBIN,MXTBIN),SHLATE(MXEBIN,MXTBIN)
+     *             ,NBZ,NBTH,ZBINN(0:MXEBIN),THBINN(0:MXTBIN)
+     *             ,USESHL
+     *             ,SHOFIL,CHDIR,CHNPAH,CHCPAH,CHNPAZ,CHCPAZ
+      CHARACTER*48 SHOFIL
+      CHARACTER*5 CHDIR
+      CHARACTER*20 CHNPAH,CHCPAH,CHNPAZ,CHCPAZ
+      LOGICAL USESHL
++SELF. ----- For VANA:
+C+PAM,12,T=CAR,ATTACH.CERN_ROOT:[SRC.CAR]GEANT314
+C+PAM,13,T=CAR,ATTACH.CERN_ROOT:[SRC.CAR]JETSET63
++SELF.
++SELF. ----- For VANZ:
+C+PAM,12,T=CAR,ATTACH.CERN_ROOT:[SRC.CAR]GEANT315
+C+PAM,13,T=CAR,ATTACH.CERN_ROOT:[SRC.CAR]JETSET73
+
++SELF. ----- ALPHA:
++PAM,12,T=CAR,ATTACH./cern/pro/car/geant315
++PAM,13,T=CAR,ATTACH./cern/pro/car/jetset63
++SELF. ----- For SUNRISE:
+C+PAM,12,T=ATTACH./cplear0/cern/pro/pam/geant
+C+PAM,13,T=ATTACH./cplear0/cern/pro/pam/jetset
++SELF.
++USE,P=NUDECK,D=NUZEND.
++EXE,P=NUDECK,D=NUZEND.
++ADD,P=NUDECK,D=NUZEND,C=4.
++CDE,NULINK.
++CDE,NUSHLC.
+      DIMENSION KEYDIR(2)
+      DATA KEYDIR/-1,-1/
++ADD,P=NUDECK,D=NUZEND,C=18.
+      CALL RZOUT(IXSTOR,JZSDIR,KEYDIR,ICYCLE,'W')
+      CALL RZEND(CHDIR)
+      CLOSE(61)
++USE,P=NUDECK,D=NUREAD.
++EXE,P=NUDECK,D=NUREAD.
++ADD,P=NUDECK,D=NUREAD,C=28.
++CDE,NUSHLC.
+      INTEGER ISHFIL(12)
+      DATA ISHFIL/12*0/
++ADD,P=NUDECK,D=NUREAD,C=164.
+      CALL FFKEY('SHOFIL',ISHFIL(1),12,'MIXED')
+      CALL FFKEY('USESHL',USESHL,1,'LOGICAL')
++ADD,P=NUDECK,D=NUREAD,C=354.
+      IF ( ISHFIL(1) .NE. 0 ) THEN
+        CALL UHTOC(ISHFIL(1),4,SHOFIL,48)
+      ENDIF
+c      WRITE(6,101)'Name of the shower library file : ',SHOFIL
++USE,P=NUDECK,D=NUZINI.
++EXE,P=NUDECK,D=NUZINI.
++ADD,P=NUDECK,D=NUZINI,C=17.
++CDE,NUSHLC.
+      DIMENSION KEYDIR(2)
++ADD,P=NUDECK,D=NUZINI,C=36.
+      CALL MZFORM('SDIR','1I / 1F 1I',IOSDIR)
+      CALL MZFORM('SHLO','3I -F',IOSHLO)
+      CALL MZFORM('SHHI','3I -F',IOSHHI)
++ADD,P=NUDECK,D=NUZINI,C=79.
+      CALL RZNDIR(CHNPAH,'R')
+      CALL RZCDIR(CHCPAH,'R')
+      CALL RZNDIR(CHNPAH,'P')
+      CALL RZCDIR(CHCPAH,'P')
+      LRECL = 0
+      CHDIR = 'LUN61'
+      CALL RZOPEN(61,CHDIR,SHOFIL,'X',LRECL,ISTAT)
+      CALL RZFILE(61,CHDIR,'X')
+      CALL RZLOGL(61,2)
+      CALL RZLDIR(' ',' ')
+      CALL RZSTAT(CHDIR,1,' ')
+C
+      KEYDIR(1) = -1
+      KEYDIR(2) = -1
+      ICYCLE = 9999
+      CALL RZIN(IXSTOR,JZSDIR,2,KEYDIR,ICYCLE,' ')
+      CALL DZSHOW('Shower directory',IXSTOR,JZSDIR,'B',1,1,1,40)
+C
+      CALL RZNDIR(CHNPAZ,'R')
+      CALL RZCDIR(CHCPAZ,'R')
+      CALL RZNDIR(CHNPAZ,'P')
+      CALL RZCDIR(CHCPAZ,'P')
+      CALL RZNDIR(CHNPAH,' ')
+      CALL RZCDIR(CHCPAH,' ')
+C
++USE,P=NUDECK,D=NU1MU.
++EXE,P=NUDECK,D=NU1MU.
++ADD,P=NUDECK,D=NU1MU,C=46.
+      ELSEIF ( KFLUXE .EQ. 4 ) THEN
+C       (* Flat in log(E) *)
+        EMU0 = E0MIN*EXP(RNUNIF(JJ)*(LOG(E0MAX)-LOG(E0MIN)))
++ADD,P=NUDECK,D=NU1MU,C=48.
+        PINSQ = (EMU0 + EMASS)*(EMU0 - EMASS)
+CC+REP,P=NUDECK,D=NU1MU,C=100-109.
+C      ELECTRON:
+C      IPTYPE = 3
+C IF we generating verticly direction of muons:
++ADD,P=NUDECK,D=NU1MU,C=288.
+      VERT(1) = 0.
+      VERT(2) = 0.
+      VERT(3) = 0.
+C+ADD,P=NUDECK,D=NU1MU,C=305.
+C      CALL HFILL(2001, VERT(1), VERT(2), 1.)
+CCCC      CALL HFILL(2002, VERT(3), 0.,      1.)
++SELF.
+C+USE,P=NUDECK,D=NUCER2.
+C+EXE,P=NUDECK,D=NUCER2.
+C+ADD,P=NUDECK,D=NUCER2,C=34.
+C+CDE,MYSHOC.
+C+ADD,P=NUDECK,D=NUCER2,C=143.
+C        CHPHEV = CHPHEV+QQ*TLEN
+C        DEANG  = RADDEG*ANG
+C        CALL HFILL(5550,DEANG,0.,QQ*TLEN)
+C        CALL HFILL(5554,chphev,0.,1.)        
+C+ADD,P=NUDECK,D=NUCER2,C=212.
+C       call hfill(6672,pmint(I),0.,1.)
+C        write(6,*) 'pmint in nucer2', pmint(I)
+C+ADD,P=NUDECK,D=NUCER2,C=264.
+C       call hfill(7773,FLOAT(npelec),0.,1.)
+C+ADD,P=NUDECK,D=NUCER2,C=286.
+C   TRANSFORM SECOND TO NANO. SECOND(1E9):
+C         TTIME = TFIRST(I)*1E9
+C        CALL HFILL(7774,TTIME,0.,1.)
+C+USE,P=NUDECK,D=NUPMIN.
+C+EXE,P=NUDECK,D=NUPMIN.
+C+REP,P=NUDECK,D=NUPMIN,C=15-20.
+C      CALL HBOOK2(1, 'PM-TUBE POSITIONS: Y VS.X',
+C     +         40, -7000., 7000., 40, -7000., 7000., 0.)
+C      CALL HBOOK2(2, 'PM-TUBE POSTIONS: Z VS.X',
+C     +         40, -7000., 7000., 40, -120000., 120000., 0.)
+C      CALL HBOOK2(3, 'PM-TUBE POSITIONS: Z VS.Y',
+C     +         40, -7000., 7000., 40, -120000., 120000., 0.)
++SELF.
+
+
++USE,P=NUDECK,D=NUOMEF.
++EXE,P=NUDECK,D=NUOMEF.
++ADD,P=NUDECK,D=NUOMEF,C=249.
+      CALL HFILL(4711,ATTLGT,0.,1.)
++ADD,P=NUDECK,D=NUOMEF,C=283.
+      CALL HFILL(4712,QUANEF,0.,1.)
++SELF.
++SELF. +USE,P=NUGU,D=GUKINE.
++SELF. +EXE,P=NUGU,D=GUKINE.
++SELF. +DEL,P=NUGU,D=GUKINE,C=56. (Delete the call to GPKINE.)
++SELF.
+C*******************************************************************************
++USE,P=NUGU,D=GUSTEP.
++EXE,P=NUGU,D=GUSTEP.
++ADD,P=NUGU,D=GUSTEP,C=10.
++CDE,GCONST.
++CDE,MYCOUN.
++CDE,MYSHOC.
++CDE,NUSHLC.
++ADD,P=NUGU,D=GUSTEP,C=12.
+C
+      LOGICAL STOSEC
+C
+      REAL BETACR
+      INTEGER ICALL
+      SAVE BETACR, ICALL
+      DATA ICALL/0/
+C
+      IF (ICALL .EQ. 0) THEN
+        BETACR = 1.0/REFIND
+        ICALL = 1
+      ENDIF
+C
+C     In this simulation, we are not interested in particles with
+C     energy below the Cherenkov threshold (only consider charged
+C     particles at this point):
+      IF (CHARGE .NE. 0.) THEN
+        BETA = VECT(7)/GETOT
+        IF (BETA .LE. BETACR) THEN
+          ISTOP = 1
+          RETURN
+        ENDIF
+      ENDIF
+C
+C   Here we calculate the total length and the time that the SHOWER takes:
+
+      IF (CHARGE .NE. 0.) THEN
+        IF ( VECT(3)- ZPRTRA(1) .GT. ZSHMAX ) THEN
+          ZSHMAX = VECT(3) - ZPRTRA(1)
+        ENDIF
+        IF ( VECT(3) .GT. ZSTMAX ) THEN
+          ZSTMAX = VECT(3)
+        ENDIF
+CCC        CALL GPCXYZ
+      ENDIF
++DEL,P=NUGU,D=GUSTEP,C=13-32.
++REP,P=NUGU,D=GUSTEP,C=65.
+                  IF (TLENG .LT. 5.0) THEN
++REP,P=NUGU,D=GUSTEP,C=72.
+        IF ( USESHL ) THEN
+          IF (INUTRA .EQ. 1) THEN
+            CALL NUCER2(PVEC,AAMASS,XM,YM,ZM,TLENG,T0,IOK)
+          ELSE
+            CALL NUSLIB(PVEC,AAMASS,XM,YM,ZM,TLENG,T0,IOK)
+          ENDIF
+        ELSE
+           CALL NUCER2(PVEC,AAMASS,XM,YM,ZM,TLENG,T0,IOK)
+        ENDIF
++ADD,P=NUGU,D=GUSTEP,C=91.
+        STOSEC = .FALSE.
+C         IF ( INUTRA .NE. 1 ) GOTO 10
++REP,P=NUGU,D=GUSTEP,C=94.
+        IF (IP .EQ. 1) THEN
+          CALL GSKING(I)
+          STOSEC = .TRUE.
+        ELSE
+          PSECON = GKIN(1,I)*GKIN(1,I) + GKIN(2,I)*GKIN(2,I) +
+     +               GKIN(3,I)*GKIN(3,I)
+          PSECON = SQRT(PSECON)
+          BETASE = PSECON/GKIN(4,I)
+          IF (BETASE .GT. BETACR) THEN
+            CALL GSKING(I)
+            STOSEC = .TRUE.
+          ENDIF
+        ENDIF
+C+ADD,P=NUGU,D=GUSTEP,C=95.
+C        IF ((INUTRA .EQ. 1) .AND. STOSEC) THEN
+C          WRITE(6,*) 'FIRST IPS=',IPS
+C          IF ( IPS .LT. MAXPS ) THEN
+C            IPS = IPS+1
+C            XPRTRA(IPS) = VECT(1)
+C            YPRTRA(IPS) = VECT(2)
+C            ZPRTRA(IPS) = VECT(3)
+C            DXPTRA(IPS) = VECT(4)
+C            DYPTRA(IPS) = VECT(5)
+C            DZPTRA(IPS) = VECT(6)
+C            PTOT1(IPS)  = VECT(7)
+C            ETOT1(1)  = SQRT(PEMAS1*PEMAS1+
+C     +                    PTOT1(1)*PTOT1(1))
+C           BETA1 = PTOT1(1)/ETOT1(1)
+C           WRITE(6,*) 'IPS=',IPS
+C           write(6,*)'dxptra,y,z',dxptra(IPS),
+C     +               dyptra(IPS),dzptra(IPS)
+C          ELSE
+C            WRITE(6,*)'IPS = ',IPS,' !!!'
+C          ENDIF
+C          PEMAS1 = AMASS
+CCC            PTOT1  = PTOT
+C            write(6,*)'ptot1=',ptot1(ips)
+C            if ( ips .gt. 1 ) then
+C              IF ( PTOT1(IPS-1)-PTOT1(IPS) .GT. 0.2*PTOT1(IPS-1)) THEN
+C                CALL GPCXYZ
+C              ENDIF
+C            ENDIF
+C       WRITE(6,*) 'store primary parameters:'
+C       WRITE(6,*) 'VECT: 4,5,6,7 =', VECT(4),VECT(5),VECT(6),VECT(7)
+CCC   TEMPORARY SOLUTION: STOP THE PRIMARY TRACK IF IT HAS GENERATED
+CCC   ANY SECONDARIES:
+CCC            ISTOP = 1
+C        ENDIF
+C+DEL,P=NUGU,D=GUSTEP,C=88.
+C+DEL,P=NUGU,D=GUSTEP,C=97-116.
+C****************************************************************************
++SELF.
++USE,P=NUGU,D=GUOUT.
++EXE,P=NUGU,D=GUOUT.
++ADD,P=NUGU,D=GUOUT,C=19.
++CDE,MYCOUN.
++CDE,MYSHOC.
++CDE,GCTRAK.
++CDE,GCONST.
++CDE,NUSHLC.
++ADD,P=NUGU,D=GUOUT,C=284.
+c        CALL HFILL(4442,ZSHMAX,0.,1.)
+c        CALL HFILL(4443,ZSTMAX,0.,1.)
+C         WRITE(6,*)'ZSHMAX,ZSTMAX=',ZSHMAX,ZSTMAX
+C          WRITE(6,*)'beta1,clight    =',beta1,clight
+C          WRITE(6,*)'STIME    =',STIME
++REP,P=NUGU,D=GUOUT,C=296.
+C       Special trigger routine for the effective-area studies:
+        CALL MYTRIG
++ADD,P=NUGU,D=GUOUT,C=298.
+         DO 555 I = 1,NHITOT
+            IF ( NPEINT(I) .GE. 0) THEN
+            CALL HFill(7775,FLOAT(NPEINT(I)),0.,1.)
+            else
+               goto 555
+            ENDIF
+ 555     CONTINUE
+
++ADD,P=NUGU,D=GUOUT,C=317.
+        SPMALL = 0.
+        SPMNQU = 0.
+        NNQUI1 = 0
+        NPMALL = 0
+        NPMNQU = 0
+        NNQUI2 = 0
++REP,P=NUGU,D=GUOUT,C=335.
+        GOTO 501
++ADD,P=NUGU,D=GUOUT,C=373.
+  501   CONTINUE
+        CALL HFILL(4001,PMINT(I),0.,1.)        
+        SPMALL = SPMALL + PMINT(I)
+        RPMINT = FLOAT(NPMINT(I))
+        CALL HFILL(4005,RPMINT,0.,1.)
+        NPMALL = NPMALL + NPMINT(I)
+        IF (NPMINT(I) .GT. 0) THEN
+          NNQUI2 = NNQUI2 + 1
+          NPMNQU = NPMNQU + NPMINT(I)
+          CALL HFILL(4006,RPMINT,0.,1.)
+        ENDIF
+        IF (PMINT(I) .GT. 0.) THEN
+          NNQUI1 = NNQUI1 + 1
+          SPMNQU = SPMNQU + PMINT(I)
+          RPHPMI = RPMINT/PMINT(I)
+          CALL HFILL(4009,RPHPMI,0.,1.)
+          IF (NPMINT(I) .GT. 0) CALL HFILL(4010,RPHPMI,0.,1.)
+        ENDIF
++ADD,P=NUGU,D=GUOUT,C=375.
+        AVPIAL = SPMALL/FLOAT(NNPM)
+        AVPEAL = FLOAT(NPMALL)/FLOAT(NNPM)
+        CALL HFILL(4003,AVPIAL,0.,1.)
+        CALL HFILL(4007,AVPEAL,0.,1.)
+        IF (NNQUI1 .GT. 0) THEN
+          AVPINQ = SPMNQU/FLOAT(NNQUI1)
+          CALL HFILL(4004,AVPINQ,0.,1.)
+        ENDIF
+        IF (NNQUI2 .GT. 0) THEN
+          AVPENQ = FLOAT(NPMNQU)/FLOAT(NNQUI2)
+          CALL HFILL(4008,AVPENQ,0.,1.)
+        ELSE
+          CALL HFILL(4008,0.,  0.,1.)
+        ENDIF
+C+ADD,P=NUGU,D=GUOUT,C=380.
+C          CALL NUSHOU
+c        WRITE(6,*)'NPMALL = ',NPMALL
+c        WRITE(6,*)'--------------------NPMINT: -------------'
+c        WRITE(6,733)NPMINT
+c 733    FORMAT(1X,10I7)
+c        WRITE(6,*)'-----------------------------------------'
++SELF.
+C+USE,P=NUGU,D=GUTREV.
+C+EXE,P=NUGU,D=GUTREV.
+C+ADD,P=NUGU,D=GUTREV,C=16.
+C+CDE,MYSHOC.
+C+ADD,P=NUGU,D=GUTREV,C=91.
+        ZSHMAX = -999999.
+        IPS = 0
+        CALL VZERO(XPRTRA,6*MAXPS)
+        STIME = 0.
+        TLENCH = 0.
+        CHPHEV = 0.
++SELF.
++USE,P=NUGU,D=GUTRAK.
++EXE,P=NUGU,D=GUTRAK.
++ADD,P=NUGU,D=GUTRAK,C=4.
++CDE,GCKINE.
++CDE,NUCPM.
++CDE,MYSHOC.
++CDE,GCONST.
++CDE,GCTRAK.
++CDE,NUSHLC.
+C+ADD,P=NUGU,D=GUTRAK,C=16.
+C        IF (INUTRA .GT. 1) THEN
+C          IPSTRA = -1
+C          DO 111 I = 1,IPS
+C            DISTSQ = (VECT(1)-XPRTRA(I))*(VECT(1)-XPRTRA(I)) +
+C     +               (VECT(2)-YPRTRA(I))*(VECT(2)-YPRTRA(I)) +
+C     +               (VECT(3)-ZPRTRA(I))*(VECT(3)-ZPRTRA(I))
+C            IF (DISTSQ .LT. 1.) THEN
+C              IPSTRA = I
+C              GOTO 112
+C            ENDIF
+C  111     CONTINUE
+C  112     CONTINUE
+C          IF (IPSTRA .EQ. -1) THEN
+C            WRITE(6,*) '*** GUTRAK: IPSTRA = -1'
+C            IPSTRA = 1
+C         ELSE
+C            WRITE(6,*) 'IPSTRA,DXPTRA = ',IPSTRA,DXPTRA(IPSTRA)
+C          ENDIF
+C        ENDIF
+        CALL HFILL(2003,FLOAT(IPART),0.,1.)
+        PTRACK = PVERT(1)*PVERT(1) + PVERT(2)*PVERT(2) + PVERT(3)
+     &    *PVERT(3)
+        PTRACK = SQRT(PTRACK)
+        CALL HFILL(2004,FLOAT(IPART),PTRACK,1.)
+        CALL HFILL(2005,FLOAT(IPART),PTRACK,1.)
+        IF (IPART .EQ. 1) THEN
+C       Gammas
+          IDFILL = 2006
+          IFILL = 3006
+        ELSEIF ((IPART .EQ. 2) .OR. (IPART .EQ. 3)) THEN
+C       e+, e-
+          IDFILL = 2007
+          idfill = 2017
+          IFILL = 3007
+        ELSEIF (IPART .EQ. 4) THEN
+C       Neutrinos
+          IDFILL = 2008
+          IFILL = 3008
+        ELSEIF ((IPART .EQ. 5) .OR. (IPART .EQ. 6)) THEN
+C       mu+, mu-
+          IDFILL = 2009
+          IFILL = 3009
+        ELSEIF (IPART .EQ. 7) THEN
+C       Pi0
+          IDFILL = 2010
+          IFILL = 3010
+        ELSEIF ((IPART .EQ. 8) .OR. (IPART .EQ. 9)) THEN
+C       pi+, pi-
+          IDFILL = 2011
+          IFILL = 3011
+        ELSEIF ((IPART .EQ. 13) .OR. (IPART .EQ. 14) .OR. (IPART .EQ.
+     &    15))
+     +THEN
+C       n, p, pbar
+          IDFILL = 2012
+          IFILL = 3012
+        ELSE
+C       Others
+          IDFILL = 2013
+          IFILL = 3013
+        ENDIF
+        CALL HFILL(IFILL,SLENG,0.,1.)
+        CALL HFILL(IDFILL,PTRACK,0.,1.)
+C
+C ******************* ANGLE'S DISTRIBUTION , FIRST AND SECONDARY ************
+C
+C        IF ( INUTRA .EQ. 1) THEN
+C          WRITE (6,*) ' INUTRA .EQ.1 !'
+C        ELSE IF ((IPART .EQ. 2) .OR. (IPART .EQ. 3)) THEN
+C Three components of momentum of the primary track:
+C          PX  = DXPTRA(IPSTRA)*PTOT1(IPSTRA)
+C          PY  = DYPTRA(IPSTRA)*PTOT1(IPSTRA)
+C          PZ  = DZPTRA(IPSTRA)*PTOT1(IPSTRA)
+C Three components of momentum of the current track:
+C          CX  = PVERT(1)
+C          CY  = PVERT(2)
+C          CZ  = PVERT(3)
+C
+C          CPX = PX*CX
+C          CPY = PY*CY
+C          CPZ = PZ*CZ
+C
+C          SPP = SQRT(PX*PX+PY*PY+PZ*PZ)
+C          SCC = SQRT(CX*CX+CY*CY+CZ*CZ)
+C
+C            WRITE(6,*) 'IPSTRA,PX,PY,PZ,P=',IPSTRA,PX,PY,PZ,SPP
+C            WRITE(6,*) 'PVERT,CURRENT:',PVERT(1),PVERT(2),
+C     +                 PVERT(3),SCC
+C
+C          COSANG = (CPX+CPY+CPZ)/(SPP*SCC)
+C          IF( ABS(COSANG ).GE. 1.) THEN
+C            COSANG = SIGN(1.,COSANG)
+C          ENDIF
+C          SHWANG = ACOS(COSANG)
+C
+C Transforms radius to degree:
+C
+C          DEGANG = SHWANG*RADDEG
+C
+C          CALL HFILL (4441, DEGANG,0.,1.)
+C
+C        ENDIF
+C *****************************************************************************
++REP,P=NUGU,D=GUTRAK,C=24.
+        IF ( USESHL ) THEN
+          IF (INUTRA .EQ. 1) THEN
+            CALL NUCER2(PVEC,AAMASS,XM,YM,ZM,TLENG,T0,IOK)
+          ELSE
+            CALL NUSLIB(PVEC,AAMASS,XM,YM,ZM,TLENG,T0,IOK)
+          ENDIF
+        ELSE
+           CALL NUCER2(PVEC,AAMASS,XM,YM,ZM,TLENG,T0,IOK)
+        ENDIF
++SELF.
+C+PAM,11,T=CAR,ATTACH. DISK$BUB:[BERL.PAN.NUSIM1]NUSIM1.CAR
+C    FOR VANA:
++PAM,11.
++SELF.
++PATCH,MYDECKS.
++DECK,NUSDAT. *********************************************************
+        SUBROUTINE NUSDAT
+C
++CDE,NUFLAG.
++CDE,NUZZIO.
++CDE,NUBANK.
++CDE,GCNUM.
++CDE,GCFLAG.
++CDE,GCLIST.
++CDE,NUCPM.
++CDE,NUGRID.
++CDE,NUFILE.
+C
+C My own COMMONs, defined above:
++CDE,MYCOUN.
+C
+        RETURN
+        END
++DECK,NUSINI. *********************************************************
+        SUBROUTINE NUSINI
+C
++CDE,NUFLAG.
++CDE,NUZZIO.
++CDE,NUBANK.
++CDE,GCNUM.
++CDE,GCFLAG.
++CDE,GCLIST.
++CDE,NUCPM.
++CDE,NUGRID.
++CDE,NUFILE.
+C
+C My own COMMONs, defined above:
++CDE,MYCOUN.
+C
+C--> My counters of # triggered events
+C
+        CALL VZERO(NTRGEV,5)
+C
+        RETURN
+        END
++DECK,NUSEND. *********************************************************
+        SUBROUTINE NUSEND
+C
++CDE,NUFLAG.
++CDE,NUZZIO.
++CDE,NUBANK.
++CDE,GCNUM.
++CDE,GCFLAG.
++CDE,GCLIST.
++CDE,NUCPM.
++CDE,NUGRID.
++CDE,NUFILE.
+C
+C My own COMMONs, defined above:
++CDE,MYCOUN.
+C
+C For the effective-area studies:
+        REAL EFFARE(5), EFAERR(5)
+C
+C--> Note: the number of actually simulated events (IEVACT) may differ
+C    from the last event number (IEVENT) in case we did restart the
+C    simulation from event number IEVTRS > 1.
+C
+C--> My counter of # triggered events
+C
+        WRITE(6,*) ' '
+        WRITE(6,*) 'Number of triggered events = ',NTRGEV(3)
+        WRITE(6,*) ' '
+C
+C ---- Number of triggered events, and (possibly) effective areas: ----
+C
+        IF (IVTXAL .NE. 3) GOTO 200
+C
+        VXPLSM = VXPLSI/100.
+        VXPLAR = VXPLSM*VXPLSM
+        DO 100 I = 1,5
+          REVENT    = FLOAT(IEVACT)
+          EFFARE(I) = FLOAT(NTRGEV(I))/REVENT
+          EFFARE(I) = EFFARE(I)*VXPLAR
+          SQROOT    = SQRT(FLOAT(NTRGEV(I)))
+          EFAERR(I) = SQROOT/REVENT
+          EFAERR(I) = EFAERR(I)*VXPLAR
+  100   CONTINUE
+C
+  200   CONTINUE
+C
+        IF (IVTXAL .EQ. 3) THEN
+          WRITE(6,101)
+        ELSE
+          WRITE(6,102)
+        ENDIF
+  101   FORMAT(
+     (/' ',4X,81('=')/
+     / ' ',4X,'Number of triggers and effective area (in m**2) ',
+     + 'for different trigger conditions:'/
+     + ' ',4X,81('=')//
+     + ' ',7X,'Trigger:',5X,'6-3',12X,'7-3',12X,'8-3',12X,'9-3',
+     + 11X,'10-3'/
+     / ' ',7X,80('-'))
+  102   FORMAT(
+     (/' ',4X,52('=')/
+     / ' ',4X,'Number of triggers for different trigger conditions:'/
+     + ' ',4X,52('=')//
+     + ' ',7X,'Trigger:',5X,'6-3',12X,'7-3',12X,'8-3',12X,'9-3',
+     + 11X,'10-3'/
+     / ' ',7X,80('-'))
+C
+        IF (IVTXAL .EQ. 3) THEN
+          WRITE(6,103) (NTRGEV(I), I=1,5), (EFFARE(I),EFAERR(I), I=1,5)
+        ELSE
+          WRITE(6,104) (NTRGEV(I), I=1,5)
+        ENDIF
+  103   FORMAT(' ',1X,' # trg.:',5(9X,I6)/
+     /       ' ',2X,85('-')/
+     /       ' ',1X,' eff. area:',5(F8.0,'+-',F5.0)/
+     /       ' ',2X,85('-')//)
+  104   FORMAT(' ',1X,' # trg.:',5(9X,I6)/' ',2X,85('-')//)
+C
+        RETURN
+        END
++DECK,NUUHB. **********************************************************
+        SUBROUTINE NUUHB
++CDE,NUMISC.
++CDE,NUFLAG.
++CDE,NUZH.
++CDE,NUGENC.
++CDE,NUGRID.
++CDE,NUPATC.
++CDE,NUCPM.
++CDE,GCFLAG.
+C
+        WRITE(6,*) ' '
+        WRITE(6,*) 'NUUHB: Booking user histograms.'
+        WRITE(6,*) ' '
+C
+        IF (FGEANT) THEN
+          CALL HBOOK2(2001,'Horizontal vertex position: y vs. x',
+     +                      40,-HGPOS,HGPOS,   40,-HGPOS,HGPOS,   0.)
+          WRITE(6,*)'NUUHB 0.5'
+          CALL HBOOK1(2002,'Vertical vertex position (z)',
+CCC     +                            50, -1.25*ZSIZE, -0.75*ZSIZE,   0.)
+     +                            50, -ZSIZE, 0.,   0.)
+          CALL HBOOK1(2003,'Particle type in GUTRAK', 50, 0., 50., 0.)
+          CALL HBOOK2(2004,'GUTRAK: Momentum vs. Particle type',
+     +                              50, 0., 50.,   50, 0., E0MAX, 0.)
+          CALL HBOOK2(2005,
+     +      'GUTRAK: Also Momentum vs. Particle type (different scale)',
+     +      50, 0., 50.,   50, 0., E0MAX/5., 0.)
+          WRITE(6,*)'0.6'
+          CALL HBOOK1(2006,'GUTRAK: Momentum (gammas)',
+     +                                          50, 0.,10., 0.)
+          CALL HBOOK1(2007,'GUTRAK: Momentum (e+, e-)',
+     +                                          50, 0., 0.5, 0.)
+          WRITE(6,*)'0.7'
+C          CALL HBOOK1(2017,'GUTRAK: Momentum (e+, e-, larger scaller)',
+C     +                                          50, 0., 300.,e0max, 0.)
+C          CALL HBOOK1(2008,'GUTRAK: Momentum (neutrinos)',
+C     +                                          50, 0., 5., 0.)
+C          CALL HBOOK1(2009,'GUTRAK: Momentum (mu+, mu-)',
+C     +                                          50, 0., 1200.,0.)
+          WRITE(6,*)'0.8'
+          CALL HBOOK1(2010,'GUTRAK: Momentum (pi0)',
+     +                                          50, 0., E0MAX/10.,0.)
+          CALL HBOOK1(2011,'GUTRAK: Momentum (pi+, pi-)',
+     +                                          50, 0., E0MAX/10.,0.)
+          CALL HBOOK1(2012,'GUTRAK: Momentum (n, p, pbar)',
+     +                                          50, 0., E0MAX/10.,0.)
+          CALL HBOOK1(2013,'GUTRAK: Momentum (others)',
+     +                                          50, 0., 10.,0.)
+      WRITE(6,*)'NUUHB 1'
+C *********************************************************************
+C HOW FAR DO PRIMARY TRACKS GO:
+          CALL HBOOK1(3006,'GUTRAK: LENGH OF (gammas)',
+     +                                          50, 0., 200.,0.)
+          CALL HBOOK1(3007,'GUTRAK:  LENGH OF(e+, e-)',
+     +                                          50, 0., 200.,0.)
+          CALL HBOOK1(3008,'GUTRAK:  LENGH OF(neutrinos)',
+     +                                          50, 0., ZSIZE,0.)
+          CALL HBOOK1(3009,'GUTRAK:  LENGH OF(mu+, mu-)',
+     +                                          50, 0., 200.,0.)
+          CALL HBOOK1(3010,'GUTRAK:  LENGH OF(pi0)',
+     +                                          50, 0., ZSIZE,0.)
+          CALL HBOOK1(3011,'GUTRAK:  LENGH OF(pi+, pi-)',
+     +                                          50, 0., ZSIZE,0.)
+          CALL HBOOK1(3012,'GUTRAK:  LENGH OF(n, p, pbar)',
+     +                                          50, 0., ZSIZE,0.)
+          CALL HBOOK1(3013,'GUTRAK:  LENGH OF(others)',
+     +                                          50, 0., ZSIZE,0.)
+C**********************************************************************
+C          CALL HBOOK1(4441,'SHOWER ANGLE DISTRIBUTION',
+C     +                                          100, 0., 200., 0.)
+C          CALL HBOOK1(4443,'TOTAL CHARGED TRACKS LENGTH',50,0.,5e5,0.)
+C
+        ENDIF
+C
+        WRITE(6,*)'NUUHB 1.5'
+C
+        IF (KCERAL .GT. 0) THEN
+C           CALL HBOOK1(5550,'THETA distribution', 45,0.,180.,0.)
+C           CALL HBOOK1(5551,'CHERENKOV Photons vs. Z$',50,0.,5e7,0.)
+C           CALL HBOOK2(5552,'TIME .VS. Z',50,0.,ZSIZE,50,0.,500.,0.)
+C           CALL HBOOK2(5553,'TIME .VS. THETA',50,0.,200.,50,0.,250.,0.)
+           CALL HBOOK1(5554,'TOTAL CHERENKOV PHOTOS ', 50,0.,5E8,0.)
+C           CALL HBOOK2(6661,'Z .VS THETA ',50,0.,200.,50,0.,zsize,0)
+C           CALL HBOOK2(6662,'TOTAL Z .vs. RADIUS',
+C     +                              50, 0., 5e4, 50, 0.,zsize, 0.)
+C           CALL HBOOK2(6664,'Z .VS. X',
+C     +                 50, -2000., 2000., 50, 0., ZSIZE, 0.)
+          CALL HBOOK1(6671,'Case in NUCERL$',20,0.5,20.5,0)
+C          CALL HBOOK1(6672,'number of photos toward PMTs(Nucer2)',50,0.,
+C     +                2e5,0.)
+          CALL HBOOK1(6673,'PHPATH in NUCERL$',50,0.,4E5,0)
+          CALL HBOOK1(6674,'RLAMBD in NUCERL$',45,0.,90.,0)
+          CALL HBOOK2(6675,'QQQ vs JCASE$',40,0.,4000.,9,0.5,9.5,0)
+          CALL HBOOK1(6676,'Photons/cm in shower$',50,0.,1E5,0)
+C          CALL HBOOK1(7773,'number of photonelectrons',50,0.,50.,0.)
+          CALL HBOOK1(7774,'TFIRST',50, 0.,1500.,0.)
+          CALL HBOOK1(7775,' number of hits(per event).VS.
+     +     PHOTO-ELECTRONS',            50, 0., 100., 0.)
+C
+          call hbook1(9998, 'eelo(showers .gt.EE', 50, 0., 
+     +                100., 0.)
+          call hbook1(9999, 'eehi(showers .gt.EE', 50, 0., 
+     +                100., 0.)
+          call hbook1(2222, 'photons stored in showers ', 50, 0., 
+     +                3e7, 0.)
+          call hbook1(3333, 'photons in showers toward to PMTs', 
+     +                50,0.,3e7, 0.)
+          CALL HBOOK1(4001,
+     +   '# Cherenkov photons in the PM tubes: Event by event',
+     +    50, 0., 200.,   0.)
+         CALL HIDOPT(4001,'LOGY')
+         IF (KCERAL .EQ. 2) THEN
+            CALL HBOOK1(4002,
+     +      '# Cherenkov photons in the PM tubes: Track by track',
+     +       50, 0., 200.,   0.)
+            CALL HIDOPT(4002,'LOGY')
+         ENDIF
+C
+       WRITE(6,*)'NUUHB 2'
+C
+         CALL HBOOK1(4003,
+     +   'Average # Cher. photons in the PMs: Event by event; All PMs',
+     +    50, 0., 50.,   0.)
+         CALL HIDOPT(4003,'LOGY')
+         CALL HBOOK1(4004,
+     +   'Av. # Cher. ph. in the PMs: Event by event; All struck PMs',
+     +    50, 0., 50.,   0.)
+         CALL HIDOPT(4004,'LOGY')
+         CALL HBOOK1(4005,
+     +   '# photo-electrons in the PM tubes: Event by event; All tubes',
+     +    70, 0., 35.,   0.)
+         CALL HIDOPT(4005,'LOGY')
+         CALL HBOOK1(4006,
+     +   '# photo-electrons in the PMs: Ev. by ev.; Firing PMs only',
+     +    90, 0., 45.,   0.)
+         CALL HIDOPT(4006,'LOGY')
+         CALL HBOOK1(4007,
+     +   'Average # photo-electrons: Event by event; All PM tubes',
+     +    60, 0., 30.,   0.)
+         CALL HIDOPT(4007,'LOGY')
+         CALL HBOOK1(4008,
+     +   'Average # photo-electrons: Event by event; Firing PMs only',
+     +    60, 0., 30.,   0.)
+         CALL HIDOPT(4008,'LOGY')
+         CALL HBOOK1(4009,
+     +   '(# photo-electrons) / (# Cherenkov photons) - All struck PMs',
+     +    70, -0.5, 3.,   0.)
+         CALL HBOOK1(4010,
+     +   '(# photo-electrons) / (# Cher. photons) - Firing PMs only',
+     +    70, -0.5, 3.,   0.)
+      ENDIF
+C
+      WRITE(6,*)'END OF NUUHB'
+C
+        RETURN
+        END
++DECK,NUUFFR. *********************************************************
+        SUBROUTINE NUUFFR
++CDE,NUCPM.
+C
+        WRITE(6,*) ' '
+        WRITE(6,*) 'NUUFFR: Defining user data cards.'
+C
+        RETURN
+        END
++DECK,NUPMUS. *********************************************************
+        SUBROUTINE NUPMUS
+C------------------------------------------------------
+C  My own routine to initialise the PM-tube positions.
+C
+C  This routine will set up the PM tubes in a simple
+C  string geometry, with nine strings each carrying
+C  three strings.
+C  Hence the values of NNPM, NSTR and NPMSTR as speci-
+C  fied in the datacards will be disregarded.
+C
+C  The vertical distance between the PM tubes on each
+C  string will be taken as DISTZ (as specified in the
+C  datacards), and the whole detector will be placed
+C  symmetrically around Z = 0.
+C  The horizontal coordinates of the strings are speci-
+C  fied below in this routine.
+C
+C  The numbering of the PM tubes will basically go from
+C  below and upwards, to make the numbering similar to
+C  that for layer detectors (ICONTY = 1). Thus the num-
+C  bering does not go string by string.
+C------------------------------------------------------
+C
++CDE,NUCPM.
++CDE,NUGRID.
+C
+        DATA NNSTR, NNPMST, NNNPM /9, 3, 27/
+C
+        REAL XSTRNG(9), YSTRNG(9)
+        DATA XSTRNG/-500., -500., -500., 0., 0., 0., 500., 500., 500./
+        DATA YSTRNG/-500., 0., 500., -500., 0., 500., -500., 0., 500./
+C
+        ICONTY = 2
+C
+C     Check if we override any datacards:
+        IF (NNSTR .NE. NSTR) THEN
+          WRITE(6,*) '*** NUPMUS: ***'
+          WRITE(6,*) 'Number of strings set to',NNSTR
+          WRITE(6,*) '***************'
+        ENDIF
+        IF (NNPMST .NE. NPMSTR) THEN
+          WRITE(6,*) '*** NUPMUS: ***'
+          WRITE(6,*) 'Number of PM tubes per string set to',NNPMST
+          WRITE(6,*) '***************'
+        ENDIF
+        IF (NNNPM .NE. NNPM) THEN
+          WRITE(6,*) '*** NUPMUS: ***'
+          WRITE(6,*) 'Number of PM tubes set to',NNNPM
+          WRITE(6,*) '***************'
+        ENDIF
+C
+        NSTR   = NNSTR
+        NPMSTR = NNPMST
+        NNPM   = NNNPM
+C
+C     Set # 'layers' equal to # PM tubes per string:
+        NLAY = NPMSTR
+C
+C      WRITE(6,*) 'NNPM,NSTR,NPMSTR = ',NNPM,NSTR,NPMSTR
+C
+        DO 10 IZPOS = 1,NPMSTR
+          DO 20 ISTR = 1,NSTR
+            IJK = (IZPOS - 1)*NSTR + ISTR
+            X0PM(IJK) = XSTRNG(ISTR)
+            Y0PM(IJK) = YSTRNG(ISTR)
+            Z0PM(IJK) = (IZPOS - 0.5*NPMSTR - 0.5)*DISTZ
+            IORIPM(IJK) = -1
+            LAYSTR(IJK) = ISTR
+C            WRITE(6,*) 'IJK, X0PM,Y0PM,Z0PM = ',
+C     +                  IJK,X0PM(IJK),Y0PM(IJK),Z0PM(IJK)
+   20     CONTINUE
+   10   CONTINUE
+C-->  Consistency checks:
+C
+        RETURN
+        END
++DECK,FEFLUX,IF=NEVER. ***** DUMMY VERSION ****************************
+        FUNCTION FEFLUX(E)
++CDE,NUGENC.
++CDE,GCONST.
+C
+C      WRITE(6,*) ' '
+C      WRITE(6,*) 'Dummy function FEFLUX called'
+C      WRITE(6,*) 'Generated energy = E0MIN = ',E0MIN
+C      WRITE(6,*) 'Generated weight = 1'
+C      WRITE(6,*) '(Please provide your own function!)'
+C
+        E = E0MIN
+        FEFLUX = 1.
+C
+        RETURN
+        END
++DECK,FSFLUX. *********************************************************
+        FUNCTION FSFLUX(THETA,PHI)
++CDE,NUGENC.
++CDE,GCONST.
+C
+        EXTERNAL FCOSSQ
+        REAL FCOSSQ
+C
+        REAL FSPACE(100)
+        SAVE FSPACE, ICALL
+        DATA ICALL/0/
+C
+        IF (ICALL .EQ. 0) THEN
+          ANGMIN = TH0MIN*DEGRAD
+          ANGMAX = TH0MAX*DEGRAD
+          CALL FUNPRE(FCOSSQ,FSPACE,ANGMIN,ANGMAX)
+          ICALL = 1
+          CALL HBOOK1(4711,'FSFLUX: Theta distribution',
+     +               60, TH0MIN, TH0MAX, 0.)
+          CALL HBOOK1(4712,'FSFLUX: Phi distribution',
+     +               36, 0., 360., 0.)
+          CALL HBOOK2(4713,'FSFLUX: Theta versus Phi',
+     +               36, 0., 360., 60, TH0MIN, TH0MAX, 0.)
+          CALL HMINIM(4711,0.)
+          CALL HMINIM(4712,0.)
+        ENDIF
+C
+        CALL FUNRAN(FSPACE,XRAN)
+        THETA = XRAN
+C
+C        PHI = TWOPI*RNDM(THETA)
+        PHI = TWOPI*RNUNIF(THETA)
+C
+        THETA = THETA*RADDEG
+        PHI   = PHI*RADDEG
+        CALL HFILL(4711,THETA,0., 1.)
+        CALL HFILL(4712,PHI,0.,   1.)
+        CALL HFILL(4713,PHI,THETA,1.)
+C
+        FSFLUX = 1.
+C
+        RETURN
+        END
+        FUNCTION FCOSSQ(ANGLE)
+        REAL ANGLE
+        COSANG = COS(ANGLE)
+        COS2 = COSANG*COSANG
+        FCOSSQ = COS2
+        RETURN
+        END
++DECK,MYTRIG. *********************************************************
+        SUBROUTINE MYTRIG
+C------------------------------------------------------------------------
+C
+C  This is an special trigger routine for the effective-area studies.
+C  It based on NUTRG2, rather than on NUTRIG.
+C  The special thing with this routine is that it applies five diffe-
+C  rent trigger conditions, instead of only one.
+C  It still defines a 'standard' trigger, though: it is the usual
+C  '8-3' one.
+C
+C  An in NUTRIG, a 'hit' in a PM tube is defined by # photo-electrons in
+C  that tube exceeding the value of NPEMIN in /NUTRIC/.
+C
+C  So far this routine is in a very preliminary stage, with only the
+C  ANANDA trigger implemented. For other detector configurations, the
+C  trigger condition is considered as being always fulfilled.
+C
+C                                       Bengt Erlandsson 15/1/93
+C
+C------------------------------------------------------------------------
+C
++CDE,NUGRID.
++CDE,NUCPM.
++CDE,NUTRIC.
++CDE,MYCOUN.
+C
+        PARAMETER (MAXSTR = 100)
+        INTEGER NHITPM, IHISTR(MAXSTR), NHISTR
+C
+C    Minimum # PM tubes required in the AMANDA trigger:
+        DATA MINPM/8/
+C    Minimum # strings required in the AMANDA trigger:
+        DATA MINSTR/3/
+C
+        DATA ICALL/0/
+C
+        SAVE MINPM, MINSTR, ICALL
+C
+        IF (IDCONF .NE. 4) THEN
+          LTRIG = .TRUE.
+          GOTO 999
+        ENDIF
+C
+C    Consider the AMANDA case in the rest of this routine!
+C
+        IF (ICALL .EQ. 0) THEN
+          ICALL = 1
+          IF (MINPM  .GT. NNPM) MINPM  = NNPM
+          IF (MINSTR .GT. NSTR) MINSTR = NSTR
+          IF (NPEMIN .GT. 1) THEN
+            WRITE(6,1) MINPM, NPEMIN, MINSTR
+          ELSEIF (NPEMIN .EQ. 1) THEN
+            WRITE(6,2) MINPM, NPEMIN, MINSTR
+          ELSE
+            WRITE(6,3) NPEMIN
+          ENDIF
+        ENDIF
+C
+C    NPEMIN = 0 means that the trigger condition has been deactivated:
+        IF (NPEMIN .LE. 0) THEN
+          LTRIG = .TRUE.
+          GOTO 999
+        ENDIF
+C
+        IF (NSTR .GT. MAXSTR) THEN
+c          WRITE(6,4) NSTR, MAXSTR
+          LTRIG = .TRUE.
+          GOTO 999
+        ENDIF
+C
+        LTRIG = .FALSE.
+C
+        CALL VZERO(IHISTR,NSTR)
+        NHITPM = 0
+        NHISTR = 0
+C
+C    Loop over all PM tubes, checking how many of them have been hit
+C    (with # photo-electrons above threshold), and counting the number
+C    of hit strings:
+        DO 10 IPM = 1,NNPM
+          IF (IORIPM(IPM) .GT. 0) GOTO 10
+          IF (NPMINT(IPM) .GE. NPEMIN) THEN
+            NHITPM = NHITPM + 1
+            ISTR = LAYSTR(IPM)
+            IF ((ISTR .LE. 0) .OR. (ISTR .GT. NSTR)) THEN
+c              WRITE(6,5) ISTR
+              GOTO 10
+            ENDIF
+            IF (IHISTR(ISTR) .LE. 0) THEN
+              IHISTR(ISTR) = 1
+              NHISTR = NHISTR + 1
+            ENDIF
+          ENDIF
+   10   CONTINUE
+C
+C    Check the various trigger conditions:
+C    1)  '6-3':
+        IF ((NHITPM .GE.  6) .AND. (NHISTR .GE. 3))
+     +    NTRGEV(1) = NTRGEV(1) + 1
+C    2)  '7-3':
+        IF ((NHITPM .GE.  7) .AND. (NHISTR .GE. 3))
+     +    NTRGEV(2) = NTRGEV(2) + 1
+C    3)  '8-3':
+        IF ((NHITPM .GE.  8) .AND. (NHISTR .GE. 3))
+     +    NTRGEV(3) = NTRGEV(3) + 1
+C    4)  '9-3':
+        IF ((NHITPM .GE.  9) .AND. (NHISTR .GE. 3))
+     +    NTRGEV(4) = NTRGEV(4) + 1
+C    5) '10-3':
+        IF ((NHITPM .GE. 10) .AND. (NHISTR .GE. 3))
+     +    NTRGEV(5) = NTRGEV(5) + 1
+C
+C    Finally, check the 'standard' trigger condition:
+CCC      LTRIG = ((NHITPM .GE. MINPM) .AND. (NHISTR .GE. MINSTR))
+        LTRIG = ((NHITPM .GE. 8) .AND. (NHISTR .GE. 3))
+C
+    1   FORMAT(' '/' ',46('*')/' ','*',44X,'*'/
+     +       ' ','*   AMANDA trigger:',26X,'*'/
+     +       ' ','*   ',15('-'),26X,'*'/' ','*',44X,'*'/
+     +       ' ','*   Require at least',I5,' PM tubes',11X,'*'/
+     +       ' ','*   with at least',5X,I3,' photo-electrons,   *'/
+     +       ' ','*   distributed over at least',I4,' strings',4X,'*'/
+     +       ' ','*',44X,'*'/' ',46('*')/' ')
+    2   FORMAT(' '/' ',45('*')/' ','*',43X,'*'/
+     +       ' ','*   AMANDA trigger:',25X,'*'/
+     +       ' ','*   ',15('-'),25X,'*'/' ','*',43X,'*'/
+     +       ' ','*   Require at least',I5,' PM tubes',10X,'*'/
+     +       ' ','*   with at least',5X,I3,' photo-electron,   *'/
+     +       ' ','*   distributed over at least',I4,' strings',3X,'*'/
+     +       ' ','*',43X,'*'/' ',45('*')/' ')
+    3   FORMAT(' '/' ',41('*')/' ','*',39X,'*'/
+     +       ' ','*   AMANDA trigger:',21X,'*'/
+     +       ' ','*   ',15('-'),21X,'*'/' ','*',39X,'*'/
+     +       ' ','*   DEACTIVATED, because NPEMIN =',I4,3X,'*'/
+     +       ' ','*',39X,'*'/' ',41('*')/' ')
+    4   FORMAT(' '/' ','*** MYTRIG: ***'/
+     +       ' ','*** Too many strings:',I5/
+     +       ' ','*** Max # strings allowed by this routine is',I5/
+     +       ' ','*** ==> Might be necessary to change in this code'/
+     +       ' ','*** (Setting triger flag = .TRUE. for this event)')
+    5   FORMAT(' '/' ','*** MYTRIG: ***'/
+     +       ' ','*** Hit in non-existent string: number',I5)
+C
+  999   CONTINUE
+C
+        RETURN
+        END
++DECK,NUPMAM,IF=MYPMAM. ***************************************************
+        SUBROUTINE NUPMAM
+C----------------------------------------------------------------------
+C
+C  This routine sets up the PM-tube positions according to the AMANDA
+C  geometry.
+C
+C  --- Special version for the `DOWN 20 PMT' set-up. ---
+C
+C  This is a string geometry, with the number of strings and the number
+C  of PM tubes per string fixed by the AMANDA specifications. Thus the
+C  values of NSTR, NNPM, and NPMSTR, as specified in the datacards, will
+C  (to some extent) be disregarded. (Where needed, they will be adjusted
+C  to the appropriate AMANDA values.)
+C
+C  The full AMANDA set-up is anticipated to have nine strings. Thus here
+C  we allow for 1 - 10 strings (specified by datacard NSTR; the default
+C  is taken to be 10). String number 1 is always taken to be that in the
+C  centre.
+C
+C  The AMANDA detector will possibly have both downward-looking and up-
+C  ward-looking PM tubes. In this implementation, the downward-looking
+C  tubes and the upward-looking tubes are installed 'on an equal foot-
+C  ing', although the former are more numerous.
+C
+C  The vertical distance between the PM tubes on each string is also
+C  fixed by the AMANDA geometry. The value of DISTZ will be adjusted to
+C  the distance between the tubes.
+C
+C  The central string will be placed at (x,y) = (0,0). As said above,
+C  this is taken to be string number 1.
+C
+C  In reality, the AMANDA detector array is going to be placed approxi-
+C  mately one kilometre below ground level. This fact is not taken into
+C  account here, where the detector will instead be centred at z = 0.
+C
+C  All strings are assumed to be perfectly vertical.
+C
+C  The numbering of the PM tubes will go string by string, from below
+C  and upwards.
+C
+C                                       Bengt Erlandsson 3/11/92
+C
+C----------------------------------------------------------------------
+C
++CDE,NUCPM.
++CDE,NUGRID.
++CDE,NUMISC.
+C
+C # strings, # PM tubes per string, and total # PM tubes:
+        PARAMETER (NNSTR  = 10)
+        PARAMETER (NNPMST = 20)
+        PARAMETER (NNNPM  = NNSTR*NNPMST)
+C
+C Vertical spacing between the PM tubes (in cm.):
+        PARAMETER (ZSPACE = 1000.)
+C
+C Distance between the central string and those at the periphery (cm):
+        PARAMETER (RADSTR = 3000.)
+C
+C Diameter of the AMANDA PM tubes (in cm.):
+        PARAMETER (AMPMDI = 19.)
+C
+C Attenuation length in the tracking medium (ice) of AMANDA, in cm.
+C (included here for a consistency check):
+        PARAMETER (ATTAMA = 1200.)
+C
+        INTEGER IORIAM(NNPMST)
+        DATA IORIAM/ -1,
+     -             -1,-1,-1,-1,-1,-1,-1,-1,
+     +             -1,-1,
+     -             -1,-1,-1,-1,-1,-1,-1,-1,
+     +             -1/
+C
+        REAL XSTRNG(NNSTR), YSTRNG(NNSTR)
+C
+        PI = 4.*ATAN(1.)
+C
+C      WRITE(6,101) 'NUPMAM: initialising AMANDA PM-tube positions.'
+C
+C     Check if we override any datacards:
+        IF ((NSTR .LT. 1) .OR. (NSTR .GT. NNSTR)) THEN
+          WRITE(6,102)
+     +      'Invalid number of strings:',NSTR,
+     +      'Number of strings set to',  NNSTR
+          NSTR = NNSTR
+        ENDIF
+        IF (NNSTR .NE. NSTR) THEN
+          WRITE(6,103)
+     +      'Simulating a reduced set-up:',
+     +      'Number of strings = ',NSTR
+        ENDIF
+        IF (NNPMST .NE. NPMSTR) THEN
+          WRITE(6,104)
+     +      'Number of PM tubes per string set to',NNPMST
+        ENDIF
+        IF (NNNPM .NE. NNPM) THEN
+          WRITE(6,105)
+     +      'Number of PM tubes set to',NNNPM
+        ENDIF
+        IF  (ZSPACE .NE. DISTZ) THEN
+          WRITE(6,106) 'DISTZ changed to',ZSPACE,' cm.'
+        ENDIF
+        IF (AMPMDI .NE. PMDIAM) THEN
+          WRITE(6,107) 'PMDIAM changed to',AMPMDI,' cm.'
+        ENDIF
+C
+C    Just a little consistency check:
+        ATTRAT = ATTLEN/ATTAMA
+        IF ((ATTRAT .LT. 0.50) .OR. (ATTRAT .GT. 2.00)) THEN
+          WRITE(6,108)
+     +      'Specified attenuation length is',ATTLEN,' cm.',
+     +      'Shouldn''t that be closer to',   ATTAMA,' cm?',
+     +      '(The value has not been changed, though.)'
+        ENDIF
+C
+        WRITE(6,109)
+C
+  101   FORMAT(//' ',54('*')/' ','*',52X,'*'/' ','*   ',A,'   *'/
+     +         ' ','*   ',46('='),'   *')
+  102   FORMAT(' ','*',52X,'*'/' ','*   *** ',A,I4,' ***',11X,'*'/
+     +       ' ','*   *** ',A,2X,I4,' ***',11X,'*')
+  103   FORMAT(' ','*',52X,'*'/' ','*   ',A,21X,'*'/
+     +       ' ','*   ',A,I4,25X,'*')
+  104   FORMAT(' ','*',52X,'*'/' ','*   *** ',A,I4,' *** *')
+  105   FORMAT(' ','*',52X,'*'/' ','*   *** ',A,I4,' ***',12X,'*')
+  106   FORMAT(' ','*',52X,'*'/' ','*   *** ',A,F9.2,A,' ***',12X,'*')
+  107   FORMAT(' ','*',52X,'*'/' ','*   *** ',A,F6.2,A,' ***',14X,'*')
+  108   FORMAT(' ','*',52X,'*'/' ','*',3X,45('*'),4X,'*'/
+     +       ' ','*   ',A,F10.3,A,4X,'*'/' ','*   ',A,4X,F10.3,A,4X,'*'/
+     +       ' ','*   ',A,8X,'*'/' ','*',3X,45('*'),4X,'*')
+  109   FORMAT(' ','*',52X,'*'/' ',54('*')/)
+C
+        NPMSTR = NNPMST
+        NNPM   = NNNPM
+        DISTZ  = ZSPACE
+        PMDIAM = AMPMDI
+        PMRAD  = 0.5*PMDIAM
+        PMR2   = PMRAD*PMRAD
+        PMAREA = PI*PMR2
+C
+C    Set # 'layers' equal to # PM tubes per string minus 1:
+        NLAY = NPMSTR - 1
+C
+C      WRITE(6,*) ' '
+C      WRITE(6,*) 'NUPMAM: NNPM, NSTR = ',NNPM,NSTR
+C      WRITE(6,*) '        NPMSTR     = ',NPMSTR
+C
+C    Angular spacing between the strings along the periphery:
+        PHISTR = 2.*PI/FLOAT(NNSTR - 1)
+C
+C    Spacing between the strings along the periphery (in cm.):
+        DPERST = 2.*RADSTR*SIN(PHISTR/2.)
+C
+C    Configuration type:
+C    -------------------
+
+        ICONTY = 2
+C
+C    Now set up the string positions (calculate the positions of all
+C    the nine strings, although we might not use all of them):
+C    ---------------------------------------------------------------
+C
+C    Central string:
+        XSTRNG(1) = 0.
+        YSTRNG(1) = 0.
+C
+C    Other strings:
+        PHI = -PHISTR/2.
+        DO 10 ISTR = 2,NNSTR
+          PHI = PHI + PHISTR
+          XSTRNG(ISTR) = RADSTR*COS(PHI)
+          YSTRNG(ISTR) = RADSTR*SIN(PHI)
+   10   CONTINUE
+
+C    Now set up the PM-tube positions:
+C    ---------------------------------
+C
+C    Vertical extension of the detector array (note: special arrangement
+C    of the two central tubes!):
+        ZDETEX = FLOAT(NPMSTR - 1 )*ZSPACE
+        IF ((ZDETEX/2. + 100.) .GT. ZSIZE) THEN
+          WRITE(6,*) ' '
+          WRITE(6,*) '*** NUPMAM: WARNING! ***'
+          WRITE(6,*) '*** GEANT volume is not large enough! ***'
+        ENDIF
+C
+        ZPMUND =  -ZDETEX/2.
+C
+        NPMST1 = NPMSTR
+        IZSPEC = NINT(FLOAT(NPMSTR)/2.)
+C
+        IJK = 0
+        DO 20 ISTR = 1,NSTR
+         WRITE(6,201) 'String number',ISTR,':'
+          ZPOS = ZPMUND - ZSPACE
+          IZ1 = 0
+          DO 30 IZ = 1,NPMST1
+            IZ1  = IZ1  + 1
+            IJK  = IJK  + 1
+            ZPOS = ZPOS + ZSPACE
+            X0PM(IJK)   = XSTRNG(ISTR)
+            Y0PM(IJK)   = YSTRNG(ISTR)
+            Z0PM(IJK)   = ZPOS
+            IORIPM(IJK) = IORIAM(IZ1)
+            LAYSTR(IJK) = ISTR
+            IF (IORIPM(IJK) .LT. 0) THEN
+               WRITE(6,202) 'IJK, X0PM,Y0PM,Z0PM = ',
+     +                       IJK,X0PM(IJK),Y0PM(IJK),Z0PM(IJK)
+            ELSE
+               WRITE(6,203) 'IJK, X0PM,Y0PM,Z0PM = ',
+     +                       IJK,X0PM(IJK),Y0PM(IJK),Z0PM(IJK),' *'
+            ENDIF
+            IF (IZ .EQ. IZSPEC) THEN
+               IZ1  = IZ1  + 1
+               IJK  = IJK  + 1
+               X0PM(IJK)   = XSTRNG(ISTR)
+               Y0PM(IJK)   = YSTRNG(ISTR)
+               Z0PM(IJK)   = ZPOS + 100.
+               IORIPM(IJK) = IORIAM(IZ1)
+               LAYSTR(IJK) = ISTR
+               IF (IORIPM(IJK) .LT. 0) THEN
+                  WRITE(6,202) 'IJK, X0PM,Y0PM,Z0PM = ',
+     +                          IJK,X0PM(IJK),Y0PM(IJK),Z0PM(IJK)
+               ELSE
+                  WRITE(6,203) 'IJK, X0PM,Y0PM,Z0PM = ',
+     +                          IJK,X0PM(IJK),Y0PM(IJK),Z0PM(IJK),' *'
+               ENDIF
+           ENDIF
+   30     CONTINUE
+   20   CONTINUE
+
+  201   FORMAT(' '/' ',A,I3,A)
+  202   FORMAT(' ',A,I4,3(2X,F10.3))
+  203   FORMAT(' ',A,I4,3(2X,F10.3),A)
+C
+        RETURN
+        END
+
+
+      SUBROUTINE  MATIN1 (A,IDIM1,N1,IDIM2,N2,INDEX,NERROR,DETERM)
+C
+C CERN PROGLIB# F100    MATIN1          .VERSION KERNFOR  3.15  820113
+C ORIG. 03/05/72 H.V.EIKEN
+C
+C        MATRIX INVERSION WITH ACCOMPANYING SOLUTION OF LINEAR EQUATIONS
+C **************************************************************************
+      DIMENSION A(IDIM1),INDEX(IDIM1)
+      DETER=1.0
+      N=N1
+      IEMAT=N+N2
+      IDIM=IDIM1
+      NMIN1=N-1
+C        THE ROUTINE DOES ITS OWN EVALUATION FOR DOUBLE SUBSCRIPTING OF
+C        ARRAY A.
+      IPIVC=1-IDIM
+C        MAIN LOOP TO INVERT THE MATRIX
+      DO 11 MAIN=1,N
+      PIVOT=0.0
+      IPIVC=IPIVC+IDIM
+C        SEARCH FOR NEXT PIVOT IN COLUMN MAIN.
+      IPIVC1=IPIVC+MAIN-1
+      IPIVC2=IPIVC +NMIN1
+      DO 2 I=IPIVC1,IPIVC2
+      IF(ABS(A(I))-ABS(PIVOT)) 2,2,1
+    1 PIVOT=A(I)
+      LPIV=I
+    2 CONTINUE
+C        IS PIVOT DIFFERENT FROM ZERO
+      IF(PIVOT) 3,15,3
+C        GET THE PIVOT-LINE INDICATOR AND SWAP LINES IF NECESSARY
+    3 ICOL=LPIV-IPIVC+1
+      INDEX(MAIN)=ICOL
+      IF(ICOL-MAIN) 6,6,4
+C        COMPLEMENT THE DETERMINANT
+    4 DETER=-DETER
+C        POINTER TO LINE PIVOT FOUND
+      ICOL=ICOL-IDIM
+C        POINTER TO EXACT PIVOT LINE
+      I3=MAIN-IDIM
+      DO 5 I=1,IEMAT
+      ICOL=ICOL+IDIM
+      I3=I3+IDIM
+      SWAP=A(I3)
+      A(I3)=A(ICOL)
+    5 A(ICOL)=SWAP
+C        COMPUTE DETERMINANT
+    6 DETER=DETER*PIVOT
+      PIVOT=1./PIVOT
+C        TRANSFORM PIVOT COLUMN
+      I3=IPIVC+NMIN1
+      DO 7 I=IPIVC,I3
+    7 A(I)=-A(I)*PIVOT
+      A(IPIVC1)=PIVOT
+C        PIVOT ELEMENT TRANSFORMED
+C
+C        NOW CONVERT REST OF THE MATRIX
+      I1=MAIN-IDIM
+C        POINTER TO PIVOT LINE ELEMENTS
+      ICOL=1-IDIM
+C        GENERAL COLUMN POINTER
+      DO 10 I=1,IEMAT
+      ICOL=ICOL+IDIM
+      I1=I1+IDIM
+C        POINTERS MOVED
+      IF(I-MAIN) 8,10,8
+C        PIVOT COLUMN EXCLUDED
+    8 JCOL=ICOL+NMIN1
+      SWAP=A(I1)
+      I3=IPIVC-1
+      DO 9 I2=ICOL,JCOL
+      I3=I3+1
+    9 A(I2)=A(I2)+SWAP*A(I3)
+      A(I1)=SWAP*PIVOT
+   10 CONTINUE
+   11 CONTINUE
+C        NOW REARRANGE THE MATRIX TO GET RIGHT INVERS
+      DO 14 I1=1,N
+      MAIN=N+1-I1
+      LPIV=INDEX(MAIN)
+      IF(LPIV-MAIN) 12,14,12
+   12 ICOL=(LPIV-1)*IDIM+1
+      JCOL=ICOL+NMIN1
+      IPIVC=(MAIN-1)*IDIM+1-ICOL
+      DO 13 I2=ICOL,JCOL
+      I3=I2+IPIVC
+      SWAP=A(I2)
+      A(I2)=A(I3)
+   13 A(I3)=SWAP
+   14 CONTINUE
+      DETERM=DETER
+      NERROR=0
+      RETURN
+   15 NERROR=MAIN
+      DETERM=DETER
+      RETURN
+      END
+
++DECK,NUSLIB. *************************************************************
+        SUBROUTINE NUSLIB(PVEC,PARMAS,X,Y,Z,TLENG,T0,OK)
+C----------------------------------------------------------------------
+C Spacial routine for reading photons from the showers library.
+C Shower library is generated in 'NUMAIN_ZLIBF.CRA' , subroutine:
+C NUSHOU.
+C_______________________________________________________________________
+C
++CDE,NUBANK.
++CDE,NUZLIN.
++CDE,NULINK.
++CDE,NUSHLC.
++CDE,MYSHOC.
++CDE,GCTRAK.
+C
+      DIMENSION KEYSH(2)
+      DATA ICALL/0/
+
+C
+C **** Given a particle with energy EE, find the two nearest
+C **** showers in the library, above and below. ( EE should be 
+C **** less than 100 Gev and greater than 2 Gev.(DEPEND ON GENERATED ENERGY) 
+C **** Otherwise we call
+C **** NUCER2 to measure the number of photons around the track.)
+C **** Take the weighted average of the higher and lower library
+C **** shower, and use it.
+C
+        EE = SQRT(VDOT(PVEC,PVEC,3))
+        IF ( EE .GT. 100.0 ) THEN
+          CALL NUCER2(PVEC,PARMAS,X,Y,Z,TLENG,T0,OK)
+        ELSEIF ( EE .LT. 2.0 ) THEN
+          CALL NUCER2(PVEC,PARMAS,X,Y,Z,TLENG,T0,OK)
+        ELSEIF ( PARMAS  .GT. 0.001 ) THEN
+          CALL NUCER2(PVEC,PARMAS,X,Y,Z,TLENG,T0,OK)
+        ELSE
+          IDXLO = -1
+          IDXHI = -1
+          EELO = -99999.9
+          EEHI = +99999.9
+          NSH = IQN(JZSDIR+1)
+C          WRITE(6,*)'Trying to find good showers,'
+C          WRITE(6,*)'among the ',NSH,' showers in the library,'
+C          WRITE(6,*)'for a particle with energy ',EE
+          DO 10 I=1,NSH
+            IF ( ICALL .EQ. 0 ) THEN
+            WRITE(6,*) ' ICALL .EQ. 0'
+            ENDIF
+            IF ( QN(JZSDIR+2*I) .LT. EE ) THEN
+              IF ( QN(JZSDIR+2*I) .GT. EELO ) THEN
+                IDXLO = IQN(JZSDIR+2*I+1)
+                EELO = QN(JZSDIR+2*I)
+C Here are the two showers closed to EE:             
+            call hfill(9998, eelo ,0.,1.)
+              ENDIF
+            ELSEIF ( QN(JZSDIR+2*I) .GT. EE ) THEN
+              IF ( QN(JZSDIR+2*I) .LT. EEHI ) THEN
+                IDXHI = IQN(JZSDIR+2*I+1)
+                EEHI = QN(JZSDIR+2*I)
+            call hfill(9999, eehi ,0.,1.)
+              ENDIF
+            ENDIF
+
+   10     CONTINUE
+          ICALL = 1
+C          WRITE(6,*)'IDXLO,IDXHI = ',IDXLO,IDXHI
+          IF (( IDXLO .LE. 0 ) .OR. (IDXHI .LE. 0 )) THEN
+C            WRITE(6,*)'Cannot find two suitable showers!'
+            CALL NUCER2(PVEC,PARMAS,X,Y,Z,TLENG,T0,OK)
+          ELSE
+C
+C ****  RZNDIR & RZCDIR: define the naming directory and the current
+C ****  working directory.'R'---> read. 'P'----> print
+C ****  CHNPAH is the default name.
+C
+            CALL RZNDIR(CHNPAZ,' ')
+            CALL RZCDIR(CHCPAZ,' ')
+C
+            KEYSH(1) = IDXLO
+            KEYSH(2) = 0
+C
+C **** Read a bank or a data structure ( CALL RZIN ):
+C
+            CALL RZIN(IXSTOR,JZSHLO,2,KEYSH,9999,' ')
+            KEYSH(1) = IDXHI
+            KEYSH(2) = 0
+            CALL RZIN(IXSTOR,JZSHHI,2,KEYSH,9999,' ')
+C
+c            WRITE(6,*)'JZSHLO,JZSHHI = ',JZSHLO,JZSHHI
+C
+            IF ( EEHI .EQ. EELO ) THEN
+              FRAC = 1.0
+              FRACM1 = 0.0
+            ELSE
+              FRAC = (EE-EELO)/(EEHI-EELO)
+              FRACM1 = 1.0-FRAC
+            ENDIF
+C
+            CALL VZERO(SHPHOT,MXEBIN*MXTBIN)
+            NBZLO = IQN(JZSHLO+2)
+            NBTLO = IQN(JZSHLO+3)
+            NBZHI = IQN(JZSHHI+2)
+            NBTHI = IQN(JZSHHI+3)
+            NBZ = MAX(NBZLO,NBZHI)
+            NBTH = MAX(NBTLO,NBTHI)
+C
+            DO 15 IZ = 1,NBZLO
+              DO 20 IT = 1,NBTLO
+                SHPHOT(IZ,IT) = FRAC*QN(JZSHLO+6+(NBTLO-1)*IZ+IT)
+   20         CONTINUE
+   15       CONTINUE
+c	
+            SHTOT = 0.0
+            DO 30 IZ = 1,NBZHI
+              DO 40 IT = 1,NBTHI
+                SHPHOT(IZ,IT) = SHPHOT(IZ,IT) +
+     +                     FRACM1*QN(JZSHHI+6+(NBTHI-1)*IZ+IT)
+   40         CONTINUE
+   30       CONTINUE
+c
+            DO 42 IZ = 1,NBZ
+              DO 44 IT = 1,NBTH
+                SHTOT = SHTOT + SHPHOT(IZ,IT)
+        	call hfill(2222,shtot,0.,1.)
+ 44           CONTINUE
+ 42         CONTINUE               
+            ZZMAX = ZBINN(NBZ)
+            if ( zzmax .le. 0 ) THEN
+c              WRITE(6,*)'ZZMAX = ',ZZMAX
+            ELSE
+              PHPCM = SHTOT/ZZMAX
+              CALL HFILL(6676,PHPCM,0.,1.)
+            ENDIF
+C
+C
+C *** Take the shower, as stored in SHPHOT, and add to the PM tube hits.
+C *** Then kill the particle.
+C
+c            WRITE(6,*)'CALLING NUCERL'
+
+            CALL NUCERL(PVEC,PARMAS,X,Y,Z,TLENG,T0,OK)
+            ISTOP = 1
+C
+C ****  Drop a bank abd its depandents: CALL MZDROP
+C
+            CALL MZDROP(IXSTOR,JZSHLO,' ')
+            CALL MZDROP(IXSTOR,JZSHHI,' ')
+            CALL RZNDIR(CHNPAH,' ')
+            CALL RZCDIR(CHCPAH,' ')
+          ENDIF
+        ENDIF
+C
+        RETURN
+        END
++DECK,NUCERL.
+            SUBROUTINE NUCERL(PVEC,PARMAS,X00,Y00,Z00,TLEN,T0,OK)
+C----------------------------------------------------------------------
+C Special routine for shower lib.
+C
+C Replace the current particle with a shower from the shower library,
+C  
+C
+C
+C TLENG is the lenght of the track segment being considered (cm).
+C                                         AUTHOR  QIN SUN 931106
+C_______________________________________________________________________
+C
+C
+        INTEGER OK
+        REAL PVEC(3)
+        REAL AC
+C
++CDE,NUFLAG.
++CDE,NUCPM.
++CDE,NUGRID.
++CDE,NUMISC.
++CDE,MYSHOC.
++CDE,NUSHLC.
+C
+C Pick up GEANT constants - pi and c, for example:
++CDE,GCONST.
+C
+C Pick up some other GEANT variables:
++CDE,GCKINE.
++CDE,GCTRAK.
+C
+C
+C--- (X0PM,Y0PM,Z0PM) in /NUPMPO/ (in +KEEP,NUCPM) are the coordinates of
+C--- each PMT in the Lab system.
+C--- (X, Y, Z) are the origin of the new coordinates which are parallell
+C--- moved to the A-th random point at the muon ray.
+C--- (X1,Y1,Z1) are the coordinates of each PMT in the rotated system of
+C--- the incoming muon.
+C--- (X00,Y00,Z00) is a random point on the muon ray.
+C--- PVEC(3) is the momentum vector of the muon; the unit is GeV/c.
+C--- PARMAS  is the particle mass (GeV/c**2).
+C--- ATTLEN  in /NUMISC/ is the attenuation length.
+C--- TLEN is the lenght of the track segment being considered (cm).
+C--- T0   is the starting time (s).
+C
+C
+C Fine structure constant:
+      PARAMETER (ALPHA = 1./137.036)
+C
+      DIMENSION X(MAXPM),   Y(MAXPM),   Z(MAXPM),
+     +          X1(MAXPM),  Y1(MAXPM),  Z1(MAXPM),  D(MAXPM),
+     +          X1SQ(MAXPM),Y1SQ(MAXPM),Z1SQ(MAXPM),DSQ(MAXPM)
+      DIMENSION TPM(MAXPM), PMI(MAXPM), TPM1(MAXPM)
+C
+      DATA ICALL/0/
+C
+      SAVE
+C
+      IF (ICALL .EQ. 0) THEN
+         BETAC  = 1./REFIND
+         CINMED = CLIGHT/REFIND
+         TWOPIA = TWOPI*ALPHA
+         CWTERM = 1./CWLGT1 - 1./CWLGT2
+         ICALL = 1
+      ENDIF
+C
+C      WRITE(6,*) 'IN NUCERL, PVEC = ',PVEC
+C      WRITE(6,*) '         , XYZ  = ',X00,Y00,Z00
+C
+      CALL VZERO(TPM, NNPM)
+C
+C---- Transform the coordinate.
+C
+C---- First translation:
+C
+      DO 60 I = 1,NNPM
+         X(I) = X0PM(I) - X00
+         Y(I) = Y0PM(I) - Y00
+         Z(I) = Z0PM(I) - Z00
+   60 CONTINUE
+C
+C---- Then rotation:
+C
+C----   The momentum of the muon is P, and its total energy is ETOT
+C----   The Cherenkov angle is ANG = ACOS(1/BETA*REFIND)
+C
+      PSQUAR = PVEC(1)*PVEC(1) + PVEC(2)*PVEC(2) + PVEC(3)*PVEC(3)
+      P      = SQRT(PSQUAR)
+      IF (P .LT. CUTKC2) GOTO 999
+C
+      ETOT  = SQRT(PSQUAR + PARMAS*PARMAS)
+      BETA  = P/ETOT
+      IF (BETA .LE. BETAC) GOTO 999
+C
+      CXBETA = CLIGHT*BETA
+C
+      COSANG = 1.0/(BETA*REFIND)
+      ANG    = ACOS(COSANG)
+      SINANG = SIN(ANG)
+      TANANG = TAN(ANG)
+C
+      PT = SQRT(PVEC(1)*PVEC(1) + PVEC(2)*PVEC(2))
+      THETA = ATAN2(PT,PVEC(3))
+      IF (PT .GT. 1.0E-3) THEN
+         ALFA = ATAN2(PVEC(2),PVEC(1))
+      ELSE
+         ALFA = 0.
+      ENDIF
+C
+      COSTHE = COS(THETA)
+      SINTHE = SIN(THETA)
+      COSALF = COS(ALFA)
+      SINALF = SIN(ALFA)
+C
+C *** Transform all PMT to MUON's system:
+C
+      DO 70 I = 1,NNPM
+        X1(I) =  COSTHE*COSALF*X(I) +
+     +           COSTHE*SINALF*Y(I) -
+     -           SINTHE*Z(I)
+        Y1(I) = -SINALF*X(I) + COSALF*Y(I)
+        Z1(I) =  SINTHE*COSALF*X(I) +
+     +           SINTHE*SINALF*Y(I) +
+     +           COSTHE*Z(I)
+        X1SQ(I) = X1(I)*X1(I)
+        Y1SQ(I) = Y1(I)*Y1(I)
+        Z1SQ(I) = Z1(I)*Z1(I)
+C
+C *** D(I) is the distance from each PMT to the muon ray
+        DSQ(I) = X1SQ(I) + Y1SQ(I)
+        D(I)   = SQRT(DSQ(I))
+CCC        WRITE(6,100) X1(I),Y1(I),Z1(I),X0PM(I),Y0PM(I),Z0PM(I)
+CCC  100   FORMAT(1X,'X1,Y1,Z1 = ',3F9.1,'  X0,Y0,Z0 = ',3F9.1)
+CCC        WRITE(6,*) 'D(I)=       ',D(I)
+   70 CONTINUE
+C
+C----   CALCULATE THE NUMBER OF PHOTONS RECEIVED BY EACH PMT
+C
+C ***** Loop over all PM tubes, and for each PM loop over
+C ***** all bins in Z along the shower.  
+C
+C      WRITE(6,*)'NNPM, NBZ = ',NNPM,NBZ
+C
+
+
+      DO 110 I = 1,NNPM
+        PMI(I) = 0.0
+        TPM(I) = 0.0
+        TPM1(I) = 9999999.9
+        RR = SQRT(X1(I)*X1(I)+Y1(I)*Y1(I))
+        RATIO = PMDIAM/(8.0*RR)
+        DDOLD = 99999.9
+        DDSUM = 0.0
+        THSUM = 0.0
+        QQQMAX = 0.0
+        DO 120 JZ = 1,NBZ
+C
+C ** For each Z bin, find the angular range covered by the tube.
+C ** and calculate which fraction of the bin angular range this is.
+C!!!!!!!!!!!!!!!!!!!
+C Rough approximation, assuming PM far from shower,
+C and much smaller than the bin size.
+C!!!!!!!!!!!!!!!!!!!
+C *** THC1(2) is the angle between Z's and the line which connecting
+C *** ZBINN(JZ-1) and the centry of the PMT. the same as THC2( from
+C *** ZBINN(JZ) point)
+C *** DD1 and DD2 is the line which connecting ZBINN(JZ-1) [or zbinn(jz)]
+C *** to the centry of PMT .
+C
+          THC1 = ATAN2(RR,Z1(I)-ZBINN(JZ-1))
+          THC2 = ATAN2(RR,Z1(I)-ZBINN(JZ))
+          DD1 = SQRT(RR*RR+(Z1(I)-ZBINN(JZ-1))**2)
+          DD2 = SQRT(RR*RR+(Z1(I)-ZBINN(JZ))**2)
+          IF ( DD2 .GT. 15000.0 ) THEN
+            IF ( DD1 .GT. 15000.0 ) THEN
+C              WRITE(6,*)'Too far from PM: DD1,DD2 = ',DD1,DD2
+              IF ( DD1+DD2 .GT. DDOLD ) THEN
+C                WRITE(6,*)'and getting worse; skip this PM'
+                GOTO 110
+              ELSE
+                GOTO 120
+              ENDIF
+            ENDIF
+          ENDIF
+          DDOLD = DD1+DD2
+C
+C *** ANGSZ1(2) is the angle from JZ-1(JZ) to two edges of PMT.
+C *** THL1(THH1) is the angle between Z's to one of PMT's edge,from
+C *** point (JZ-1).
+C         
+          ANGSZ1 = 2.0*ATAN2(0.5*PMDIAM,DD1)
+          ANGSZ2 = 2.0*ATAN2(0.5*PMDIAM,DD2)
+          THL1 = THC1-0.5*ANGSZ1
+          THH1 = THC1+0.5*ANGSZ1
+          THL2 = THC2-0.5*ANGSZ2
+          THH2 = THC2+0.5*ANGSZ2
+C  
+          NTL1 = NBINTH(RADDEG*THL1)
+          NTH1 = NBINTH(RADDEG*THH1)
+          NTL2 = NBINTH(RADDEG*THL2)
+          NTH2 = NBINTH(RADDEG*THH2)
+c	 WRITE(6,*)'NTH1,NTH2=',NTH1,NTH2
+c	 WRITE(6,*)'NTL1,NTL2=',NTL1,NTL2
+          QQQ = 0.0
+          IDUM = NBINZ(QQQ)
+          ZWID = ZBINN(JZ)-ZBINN(JZ-1)
+          JCASE = -1
+CC          WRITE(6,*)'Before NTL-ifs'
+C
+C*** Find PM coverage in theta-zeta plane:
+C*** How many theta bins are involved in this zeta bin?
+C
+          IF ( NTL1 .EQ. NTH1 ) THEN
+            IF ( NTL2 .EQ. NTH2 ) THEN
+              IF ( NTL1 .EQ. NTL2 ) THEN
+C
+C***   All in one theta-zeta bin, no problem.
+C
+                JCASE = 1
+                IF ( SHPHOT(JZ,NTL1) .LE. 0.0 ) THEN
+                  GOTO 120
+                ENDIF
+                THWID = DEGRAD*(THBINN(NTL1)-THBINN(NTL1-1))
+C
+C *** APM is the areas to be calculated:
+C
+                APM = ZWID*0.5*((THH1-THL1)+(THH2-THL2))
+                FRAC = APM/(ZWID*THWID)
+C
+C *** Frac is the theta-zeta-fraction covered by the tube.
+C *** The additional angsz/8 factor is for phi coverage
+C *** and circular-not-square PM cross section.
+C ***** QQQ is the number of photons in APM.
+C
+                QQQ = FRAC*RATIO*SHPHOT(JZ,NTL1)
+C          write(6,*) ' case 1:'
+C	  write(6,*) 'frac',frac
+C          write(6,*) ' ratio', ratio
+C          write(6,*) ' shphot', shphot(jz,ntl1)
+C	  WRITE(6,*)'CASE 1,QQQ',QQQ
+              ELSEIF ( NTL2 .EQ. NTL1+1 ) THEN
+C
+C ***  Two theta-zeta bins, triangle calculations.
+C ***** Case 2: THL1,THH1 are in the same bin (NTL1), and THL2,THH2 are in
+C ***** next bin ( means: NTL2 = NTL1+1)
+C
+                JCASE = 2
+                IF ( ( SHPHOT(JZ,NTL1) .LE. 0.0 )
+     *          .AND.( SHPHOT(JZ,NTL2) .LE. 0.0 )) THEN
+                   GOTO 120
+                ENDIF
+C
+C ***** BHH is the slope of up-edge line of the triangle.(BLL is lower one)
+C ***** ZHH is uper-point coordinate in Z's axis.ZLL is a lower coordinate.
+C
+                BHH = (ZBINN(JZ)-ZBINN(JZ-1))/(THL2-THL1)
+                ZHH = ZBINN(JZ-1) + BHH*(DEGRAD*THBINN(NTL1)-THL1)
+                BLL = (ZBINN(JZ)-ZBINN(JZ-1))/(THH2-THH1)
+                ZLL = ZBINN(JZ-1) + BLL*(DEGRAD*THBINN(NTL1)-THH1)
+                TRIHH = 0.5*(DEGRAD*THBINN(NTL1)-THL1)*(ZHH-ZBINN(JZ-1))
+                TRILL = 0.5*(DEGRAD*THBINN(NTL1)-THH1)*(ZLL-ZBINN(JZ-1))
+                APM = TRIHH-TRILL
+                THWID = DEGRAD*(THBINN(NTL1)-THBINN(NTL1-1))
+                FRAC = APM/(ZWID*THWID)
+                QQQ = FRAC*RATIO*SHPHOT(JZ,NTL1)
+C          write(6,*) ' case 2,part 1:'
+C	  write(6,*) 'frac',frac
+C          write(6,*) ' ratio', ratio
+C          write(6,*) ' shphot', shphot(jz,ntl1)
+C	 WRITE(6,*)'CASE 2,QQQ',QQQ
+                TRIHH = 0.5*(THL2-DEGRAD*THBINN(NTL1))*(ZBINN(JZ)-ZHH)
+                TRILL = 0.5*(THH2-DEGRAD*THBINN(NTL1))*(ZBINN(JZ)-ZLL)
+                APM = TRILL-TRIHH
+                FRAC = APM/(ZWID*THBINN(NTL1+1)-THBINN(NTL1))
+C                QQQ = QQQ + FRAC*RATIO*SHPHOT(JZ,NTL1+1)
+                 QQQ = QQQ + FRAC*RATIO*SHPHOT(JZ,NTL1)
+C          write(6,*) ' case 2,part 2:'
+C	  write(6,*) 'frac',frac
+C          write(6,*) ' ratio', ratio
+C          write(6,*) ' shphot', shphot(jz,ntl1)
+C	 WRITE(6,*)'CASE 2,QQQ',QQQ
+              ELSE
+C ***  Several theta-zeta bins. Triangles at each end,
+C ***  as above, and loop over the bins between.
+C *****  Case 3: THL1,THH1 are in the same bin (NTL1), and THL2,THH2 are in
+C *****  the same bin ( NTL2 ). There are some bins between NTL1 and NTL2. 
+C 
+                JCASE = 3
+                BHH = (ZBINN(JZ)-ZBINN(JZ-1))/(THL2-THL1)
+                ZHH = ZBINN(JZ-1) + BHH*(DEGRAD*THBINN(NTL1)-THL1)
+                BLL = (ZBINN(JZ)-ZBINN(JZ-1))/(THH2-THH1)
+                ZLL = ZBINN(JZ-1) + BLL*(DEGRAD*THBINN(NTL1)-THH1)
+                TRIHH = 0.5*(DEGRAD*THBINN(NTL1)-THL1)*(ZHH-ZBINN(JZ-1))
+                TRILL = 0.5*(DEGRAD*THBINN(NTL1)-THH1)*(ZLL-ZBINN(JZ-1))
+                APM = TRIHH-TRILL
+                THWID = DEGRAD*(THBINN(NTL1)-THBINN(NTL1-1))
+                FRAC = APM/(ZWID*THWID)
+                QQQ = FRAC*RATIO*SHPHOT(JZ,NTL1)
+C          write(6,*) ' case 3,part 1:'
+C	  write(6,*) 'frac',frac
+C          write(6,*) ' ratio', ratio
+C          write(6,*) ' shphot', shphot(jz,ntl1)
+C	 WRITE(6,*)'CASE 3,QQQ1',QQQ
+                DO 210 ITL = NTL1+1,NTL2-1
+                  ZHH0 = ZHH
+                  ZLL0 = ZLL
+                  THWID = DEGRAD*(THBINN(ITL)-THBINN(ITL-1))
+                  ZHH = ZHH0 + BHH*THWID
+                  ZLL = ZLL0 + BLL*THWID
+                  APM = 0.5*((ZHH-ZLL)+(ZHH0-ZLL0))*THWID
+                  FRAC = APM/((ZBINN(JZ)-ZBINN(JZ-1))*THWID)
+                  QQQ = QQQ + FRAC*RATIO*SHPHOT(JZ,ITL)
+C                  QQQ = QQQ + FRAC*RATIO*SHPHOT(JZ,NTL2)
+ 210            CONTINUE
+C          write(6,*) ' case 3,part 2:'
+C	  write(6,*) 'frac',frac
+C          write(6,*) ' ratio', ratio
+C          write(6,*) ' shphot', shphot(jz,ntl1)
+C	 WRITE(6,*)'CASE 3,QQQ2',QQQ
+
+                TRIHH = 0.5*(THL2-DEGRAD*THBINN(NTL2-1))
+     *                  *(ZBINN(JZ)-ZHH)
+                TRILL = 0.5*(THH2-DEGRAD*THBINN(NTL2-1))
+     *                  *(ZBINN(JZ)-ZLL)
+                APM = TRILL-TRIHH
+                FRAC = APM/((ZBINN(JZ)-ZBINN(JZ-1))
+     *                 *DEGRAD*(THBINN(NTL2)-THBINN(NTL2-1)))
+                QQQ = QQQ + FRAC*RATIO*SHPHOT(JZ,NTL2)
+C          write(6,*) ' case 3,part 3:'
+C	  write(6,*) 'frac',frac
+C          write(6,*) ' ratio', ratio
+C          write(6,*) ' shphot', shphot(jz,ntl1)
+C	 WRITE(6,*)'CASE 3,QQQ3',QQQ
+              ENDIF
+            ELSEIF ( NTL2 .EQ. NTL1 ) THEN
+C
+C ***  Two theta-zeta bins, complicated triangle calculations.
+C *****  Case 4: THL1,THH1,THL2 in the same bin (NTL1), and THH2 in next 
+C *****  bin (NTH2 = NTL1+1).
+C 
+              JCASE = 4
+              BHH = ZWID/(THL2-THL1)
+              ZHH = ZBINN(JZ-1) + BHH*(DEGRAD*THBINN(NTL1)-THL1)
+              THHH = ZWID/BHH + THL1
+              BLL = ZWID/(THH2-THH1)
+              ZLL = ZBINN(JZ-1) + BLL*(DEGRAD*THBINN(NTL1)-THH1)
+              TRIHH = 0.5*(DEGRAD*THBINN(NTL1)-THL1)*(ZHH-ZBINN(JZ-1))
+              TRIHHH = 0.5*(DEGRAD*THBINN(NTL1)-THHH)*(ZHH-ZBINN(JZ))
+              TRILL = 0.5*(DEGRAD*THBINN(NTL1)-THH1)*(ZLL-ZBINN(JZ-1))
+              APM = TRIHH-TRILL-TRIHHH
+              THWID = DEGRAD*(THBINN(NTL1)-THBINN(NTL1-1))
+              FRAC = APM/(ZWID*THWID)
+              QQQ = FRAC*RATIO*SHPHOT(JZ,NTL1)
+C          write(6,*) ' case 4,part 1:'
+C	  write(6,*) 'frac',frac
+C          write(6,*) ' shphot', shphot(jz,ntl1)
+C	 WRITE(6,*)'CASE 4,QQQ1',QQQ
+              TRILL = 0.5*(THH2-DEGRAD*THBINN(NTL1))*(ZBINN(JZ)-ZLL)
+              APM = TRILL
+              FRAC = APM/((ZBINN(JZ)-ZBINN(JZ-1))
+     *                *DEGRAD*(THBINN(NTL1+1)-THBINN(NTL1)))
+              QQQ = QQQ + FRAC*RATIO*SHPHOT(JZ,NTL1+1)
+C              QQQ = QQQ + FRAC*RATIO*SHPHOT(JZ,NTL2)
+C          write(6,*) ' case 4,part 2:'
+C	  write(6,*) 'frac',frac
+C          write(6,*) ' ratio', ratio
+C          write(6,*) ' shphot(NTLE+1)', shphot(jz,ntl1+1)
+C	 WRITE(6,*)'CASE 4,QQQ2',QQQ
+            ELSE
+C
+C *****  Case 5: THL1,THH1 in the same bin (NTL1), THH2 in the bin(NTH2) which 
+C *****  next to THL2 [bin (NTH2=NTL2+1)], There are some bins between NTL1 and 
+C *****  THL2. 
+C
+
+              JCASE = 5
+              BHH = (ZBINN(JZ)-ZBINN(JZ-1))/(THL2-THL1)
+              ZHH = ZBINN(JZ-1) + BHH*(DEGRAD*THBINN(NTL1)-THL1)
+              BLL = (ZBINN(JZ)-ZBINN(JZ-1))/(THH2-THH1)
+              ZLL = ZBINN(JZ-1) + BLL*(DEGRAD*THBINN(NTL1)-THH1)
+              TRIHH = 0.5*(DEGRAD*THBINN(NTL1)-THL1)*(ZHH-ZBINN(JZ-1))
+              TRILL = 0.5*(DEGRAD*THBINN(NTL1)-THH1)*(ZLL-ZBINN(JZ-1))
+              APM = TRIHH-TRILL
+              THWID = DEGRAD*(THBINN(NTL1)-THBINN(NTL1-1))
+              FRAC = APM/(ZWID*THWID)
+              QQQ = FRAC*RATIO*SHPHOT(JZ,NTL1)
+C          write(6,*) ' case 5,part 1:'
+C	  write(6,*) 'frac',frac
+C          write(6,*) ' ratio', ratio
+C          write(6,*) ' shphot', shphot(jz,ntl1)
+C	 WRITE(6,*)'CASE 5,QQQ1',QQQ
+              DO 220 ITL = NTL1+1,NTL2
+                ZHH0 = ZHH
+                ZLL0 = ZLL
+                THWID = DEGRAD*(THBINN(ITL)-THBINN(ITL-1))
+                ZHH = ZHH0 + BHH*THWID
+                ZLL = ZLL0 + BLL*THWID
+                APM = 0.5*((ZHH-ZLL)+(ZHH0-ZLL0))*THWID
+                IF ( ZHH .GT. ZBINN(JZ) ) THEN
+                  APM = APM-0.5*(ZHH-ZBINN(JZ))*
+     *                 (DEGRAD*THBINN(ITL)-THL2)
+                ENDIF
+                FRAC = APM/(ZWID*THWID)
+                QQQ = QQQ + FRAC*RATIO*SHPHOT(JZ,ITL)
+C          write(6,*) ' case 5,part 2:'
+C	  write(6,*) 'frac',frac
+C          write(6,*) ' ratio', ratio
+C          write(6,*) ' shphot', shphot(jz,ntl1)
+C	 WRITE(6,*)'CASE 5,QQQ2',QQQ
+ 220          CONTINUE
+              TRILL = 0.5*(THH2-DEGRAD*THBINN(NTL2))*(ZBINN(JZ)-ZLL)
+              APM = TRILL
+              FRAC = APM/((ZBINN(JZ)-ZBINN(JZ-1))
+     *               *DEGRAD*(THBINN(NTL2+1)-THBINN(NTL2)))
+C              QQQ = QQQ + FRAC*RATIO*SHPHOT(JZ,NTL2+1)
+              QQQ = QQQ + FRAC*RATIO*SHPHOT(JZ,NTL2)
+C          write(6,*) ' case 5,part 3:'
+C	  write(6,*) 'frac',frac
+C          write(6,*) ' ratio', ratio
+C          write(6,*) ' shphot', shphot(jz,ntl1)
+C	 WRITE(6,*)'CASE 5,QQQ3',QQQ
+            ENDIF
+          ELSEIF ( NTL2 .EQ. NTH2 ) THEN
+C
+C *****  Case 6: THL1 and THH1 in the different bins, but THL2 and THH2 in the
+C *****  same bin:
+C
+             JCASE = 6
+C      	WRITE(6,*)'CASE 6,FIRST SHPHOT(NTL1,NTL1+1,NTL1-1):'
+C        WRITE(6,*) ,SHPHOT(JZ,NTL1),SHPHOT(JZ,NTL1+1),SHPHOT(JZ,NTL1-1)
+              BHH = ZWID/(THL2-THL1)
+              ZHH = ZBINN(JZ-1) + BHH*(DEGRAD*THBINN(NTL1)-THL1)
+              BLL = (ZBINN(JZ)-ZBINN(JZ-1))/(THH2-THH1)
+              TRIHH = 0.5*(DEGRAD*THBINN(NTL1)-THL1)*(ZHH-ZBINN(JZ-1))
+              APM = TRIHH 
+              FRAC = APM/((ZBINN(JZ)-ZBINN(JZ-1))
+     *               *DEGRAD*(THBINN(NTL1)-THBINN(NTL1-1)))
+              QQQ = FRAC*RATIO*SHPHOT(JZ,NTL1)
+C          write(6,*) ' shphot(NTL1)', shphot(jz,ntl1)
+C	 WRITE(6,*)'CASE 6,QQQ1',QQQ
+C              
+              ZHH = ZBINN(JZ-1) + BHH*(DEGRAD*THBINN(NTL1+1)-THL1)
+              ZLL = ZBINN(JZ-1) + BLL*(DEGRAD*THBINN(NTL1+1)-THH1)
+              TRIHH = 0.5*(DEGRAD*THBINN(NTL1+1)-THL1)*(ZHH-ZBINN(JZ-1))
+              TRILL = 0.5*(DEGRAD*THBINN(NTL1+1)-THH1)*(ZLL-ZBINN(JZ-1))
+              APM = TRIHH - TRILL - APM
+              FRAC = APM/((ZBINN(JZ)-ZBINN(JZ-1))
+     *               *DEGRAD*(THBINN(NTL1+1)-THBINN(NTL1)))
+              QQQ = FRAC*RATIO*SHPHOT(JZ,NTL1+1)
+C          write(6,*) ' shphot(NTL1+1)', shphot(jz,ntl1+1)
+C	 WRITE(6,*)'CASE 6,QQQ2',QQQ
+C              
+              DO 230 ITL = NTL1+2,NTL2-1
+                ZHH0 = ZHH
+                ZLL0 = ZLL
+                THWID = DEGRAD*(THBINN(ITL)-THBINN(ITL-1))
+                ZHH = ZHH0 + BHH*THWID
+                ZLL = ZLL0 + BLL*THWID
+                APM = 0.5*((ZHH-ZLL)+(ZHH0-ZLL0))*THWID
+C                IF ( ZHH .GT. ZBINN(JZ) ) THEN
+C                  APM = APM-0.5*ZHH*(DEGRAD*THBINN(ITL)-THL2)
+C                ENDIF
+                FRAC = APM/(ZWID*THWID)
+                QQQ = QQQ + FRAC*RATIO*SHPHOT(JZ,ITL)
+C          write(6,*) ' shphot(ITL)', shphot(jz,ITL)
+C	 WRITE(6,*)'CASE 6,QQQ3',QQQ
+ 230          CONTINUE
+              TRILL = 0.5*(THH2-DEGRAD*THBINN(NTL2-1))*(ZBINN(JZ)-ZLL)
+              TRIHH = 0.5*(THL2-DEGRAD*THBINN(NTL2-1))*(ZBINN(JZ)-ZHH)
+              APM = TRILL - TRIHH
+              FRAC = APM/((ZBINN(JZ)-ZBINN(JZ-1))
+     *               *DEGRAD*(THBINN(NTL2)-THBINN(NTL2-1)))
+              QQQ  = QQQ+ FRAC*RATIO*SHPHOT(JZ,NTL2)
+C          write(6,*) ' shphot(NTL2)', shphot(jz,ntl2)
+C	 WRITE(6,*)'CASE 6,QQQ4',QQQ
+          ELSE
+C
+C ***** The last case, THL1,THH1 in different bins(next) and THL2,THH2 also 
+C ***** in different bins:( some bins between THL1 and THL2) 
+C
+            JCASE = 7
+              BHH = ZWID/(THL2-THL1)
+              ZHH = ZBINN(JZ-1) + BHH*(DEGRAD*THBINN(NTL1)-THL1)
+              BLL = (ZBINN(JZ)-ZBINN(JZ-1))/(THH2-THH1)
+              TRIHH = 0.5*(DEGRAD*THBINN(NTL1)-THL1)*(ZHH-ZBINN(JZ-1))
+              APM = TRIHH 
+              FRAC = APM/((ZBINN(JZ)-ZBINN(JZ-1))
+     *               *DEGRAD*(THBINN(NTL1)-THBINN(NTL1-1)))
+              QQQ = FRAC*RATIO*SHPHOT(JZ,NTL1)
+C          write(6,*) ' shphot(NTL1)', shphot(jz,ntl1)
+C	 WRITE(6,*)'CASE 7,QQQ1',QQQ
+C
+              ZHH = ZBINN(JZ-1) + BHH*(DEGRAD*THBINN(NTL1+1)-THL1)
+              ZLL = ZBINN(JZ-1) + BLL*(DEGRAD*THBINN(NTL1+1)-THH1)
+              TRIHH = 0.5*(DEGRAD*THBINN(NTL1+1)-THL1)*(ZHH-ZBINN(JZ-1))
+              TRILL = 0.5*(DEGRAD*THBINN(NTL1+1)-THH1)*(ZLL-ZBINN(JZ-1))
+              APM = TRIHH - TRILL - APM
+              FRAC = APM/((ZBINN(JZ)-ZBINN(JZ-1))
+     *               *DEGRAD*(THBINN(NTL1+1)-THBINN(NTL1)))
+              QQQ = QQQ+FRAC*RATIO*SHPHOT(JZ,NTL1+1)
+C          write(6,*) ' case 7,part 2:'
+C	  write(6,*) 'frac',frac
+C          write(6,*) ' ratio', ratio
+C          write(6,*) ' shphot', shphot(jz,ntl1)
+C	 WRITE(6,*)'CASE 7,QQQ2',QQQ
+C              
+              DO 240 ITL = NTL1+2,NTL2-1
+                ZHH0 = ZHH
+                ZLL0 = ZLL
+                THWID = DEGRAD*(THBINN(ITL)-THBINN(ITL-1))
+                ZHH = ZHH0 + BHH*THWID
+                ZLL = ZLL0 + BLL*THWID
+                APM = 0.5*((ZHH-ZLL)+(ZHH0-ZLL0))*THWID
+C                IF ( ZHH .GT. ZBINN(JZ) ) THEN
+C                  APM = APM-0.5*ZHH*(DEGRAD*THBINN(ITL)-THL2)
+C                ENDIF
+                FRAC = APM/(ZWID*THWID)
+                QQQ = QQQ + FRAC*RATIO*SHPHOT(JZ,ITL)
+
+C          write(6,*) ' case 7,part 3:'
+C	  write(6,*) 'frac',frac
+C          write(6,*) ' ratio', ratio
+C          write(6,*) ' shphot', shphot(jz,ntl1)
+C	 WRITE(6,*)'CASE 7,QQQ3',QQQ
+ 240          CONTINUE	       
+              ZHH = ZBINN(JZ-1) + BHH*(DEGRAD*THBINN(NTL2-1)-THL1)
+              ZLL = ZBINN(JZ-1) + BLL*(DEGRAD*THBINN(NTL2-1)-THH1)
+              TRIHH = 0.5*(THH2-DEGRAD*THBINN(NTL2-1))*(ZBINN(JZ)-ZLL)
+              TRILL = 0.5*(THL2-DEGRAD*THBINN(NTL2-1))*(ZBINN(JZ)-ZHH)
+              ZLL   = ZBINN(JZ-1) + BLL*(DEGRAD*THBINN(NTL2)-THH1)
+              TRILLL = 0.5*(THH2-DEGRAD*THBINN(NTL2))*(ZBINN(JZ)-ZLL)
+              APM = TRIHH - TRILL - TRILLL
+              FRAC = APM/((ZBINN(JZ)-ZBINN(JZ-1))
+     *                *DEGRAD*(THBINN(NTL2)-THBINN(NTL2-1)))
+	      QQQ = QQQ+FRAC*RATIO*SHPHOT(JZ,NTL2)
+C          write(6,*) ' case 7,part 4:'
+C	  write(6,*) 'frac',frac
+C          write(6,*) ' ratio', ratio
+C          write(6,*) ' shphot', shphot(jz,ntl1)
+C	 WRITE(6,*)'CASE 7,QQQ4',QQQ
+C
+              APM = TRILLL 
+              FRAC = APM/((ZBINN(JZ)-ZBINN(JZ-1))
+     *               *DEGRAD*(THBINN(NTL2+1)-THBINN(NTL2)))
+              QQQ = QQQ + FRAC*RATIO*SHPHOT(JZ,NTL2)
+C          write(6,*) ' case 7,part 5:'
+C	  write(6,*) 'frac',frac
+C          write(6,*) ' ratio', ratio
+C          write(6,*) ' shphot', shphot(jz,ntl1)
+C	 WRITE(6,*)'CASE 7,QQQ5',QQQ
+c	 WRITE(6,*)'CASE 7,QQQ',QQQ
+          ENDIF
+C                                                                               
+C  NOW WE GOT THE TOTAL NUMBER OF PHOTONS FROM THE SHOWERS, can be read by PMTs:
+
+          CALL HFILL(6671,FLOAT(JCASE),0.,1.)
+          CALL HFILL(6675,QQQ,FLOAT(JCASE),1.)
+          IF ( QQQ .GT. QQQMAX ) THEN
+            QQQMAX = QQQ
+            JCMAX = JCASE
+          ENDIF
+C
+c # Cherenkov photons read from the shower in the direction towards
+c   the tube: pmi(I)
+          PMI(I) = PMI(I) + QQQ
+          call hfill(3333,pmi(I),0.,1.)
+          DDSUM = DDSUM + 0.5*(DD1+DD2)*QQQ
+          THSUM = THSUM + 0.5*(THC1+THC2)*QQQ
+          TT = T0 + 0.5*(ZBINN(JZ)+ZBINN(JZ-1)) 
+     +            + 0.5*(DD1+DD2)*REFIND/CLIGHT
+          TPM(I) = TPM(I) + PMI(I)*TT
+c         call hfill(7773,tpm(I),0.,1.)
+          IF ( TT .LT. TPM1(I) ) THEN
+            TPM1(I) = TT
+          ENDIF
+C
+ 120    CONTINUE
+C
+         IF (PMI(I) .LE. 0.) GOTO 110
+C
+C--- AVERAGE PHOTON PATH
+C
+         PHPATH = DDSUM/PMI(I)
+         CALL HFILL(6673,PHPATH,0.,PMI(I))
+         RLAMBD = THSUM/PMI(I)
+         CALL HFILL(6674,RADDEG*RLAMBD,0.,PMI(I))
+C
+C--- Average the time:
+C
+         TPM(I) = TPM(I)/PMI(I)
+C
+C       Now find a reasonable INTEGER number for the # Cherenkov
+C       photons reaching the PM tube:
+         CALL POISSN(PMI(I),NPHTMP,IERR)
+C
+         IF (NPHTMP .LE. 0) GOTO 110
+C
+C----   CALCULATE THE EFFICIENCY OF THE PHOTON IN EACH PMT
+C
+C       Calculate the angle between the photon path and the Z axis in lab.
+C !!!!!!!!!!!!!!!!!!!!!
+C  This assumes Cerenkov angle, and should be fixed!
+C!!!!!!!!!!!!!!!!!!!!!!
+C
+         IF (PHPATH .GT. PMRAD) THEN
+           COSLAM = COS(RLAMBD)
+         ELSE
+            COSLAM = 1.
+            RLAMBD = 0.
+         ENDIF
+         IF (IORIPM(I) .GT. 0) RLAMBD = PI - RLAMBD
+C
+C       Now for the calculation of the number of photo-electrons...
+C
+         NPELEC = 0
+C
+C       Take into account the efficiency of the PM tube, including the
+C       wavelength-dependent attenuation of the Cherenkov light, the
+C       wavelength-dependent quantum efficiency, and the geometrical
+C       acceptance of the tube:
+         CALL NUOMEF(I,RLAMBD,PHPATH,BETA,NPHTMP,NPELEC)
+C
+         IF ( NPELEC .GT. 100 ) THEN
+C           WRITE(6,*)'Too many photons!?'
+C           WRITE(6,*)'NPELEC,PMI,PHPATH = ',NPELEC,PMI(I),PHPATH
+C           WRITE(6,*)'Shower XYZ = ',X00,Y00,Z00
+C           WRITE(6,*)'PM-XYZ     = ',X1(I),Y1(I),Z1(I)
+c          WRITE(6,*)'QQQMAX,JCMAX = ',QQQMAX,JCMAX
+          ENDIF
+C
+C      (The output from the above subroutine call is NPELEC.)
+C
+C     - Note: The jump goes to statement label 111, not 110.
+         IF (NPELEC .LE. 0) GOTO 111
+C
+         IF (FTISME) THEN
+C          Find the smearing of the time response of the PM tube to
+C          the signal giving rise to these NPELEC photo-electrons:
+            CALL NUTSME(I,NPELEC,TSMEAR)
+            TPM(I) = TPM(I) + TSMEAR
+         ENDIF
+C
+C       Calculate the 'average' arrival time of the Cherenkov photons:
+         IF (TAVE(I) .EQ. 0.) THEN
+            TAVE(I) = TPM(I)
+         ELSE
+            TAVE(I) = (TAVE(I)*FLOAT(NPMINT(I)) + TPM(I)*FLOAT(NPELEC))
+     /               /FLOAT(NPMINT(I) + NPELEC)
+         ENDIF
+C
+         IF (TPM1(I) .LT. TFIRST(I)) THEN
+            TFIRST(I) = TPM1(I)
+         ENDIF
+C
+         NPMINT(I) = NPMINT(I) + NPELEC
+C
+C     - Continue here, even if NPELEC = 0.
+  111    CONTINUE
+C
+C     - Use this condition, instead of simply NPELEC = 0, for skipping
+C       the 'hit by hit' stuff. The reason for doing this is that we
+C       want to be able to play around with the efficiecies 'off-line'.
+C       (Note: For 'hits' with 0 photo-electrons there will be no smea-
+C       ring of the time response in the 'hit-by-hit' vector TIMHIT,
+C       even if FTISME is set = TRUE.)
+         IF ((PMI(I) .LE. 0.1) .AND. (NPELEC .LE. 0)) GOTO 110
+C
+C       Fill the 'hit by hit' vectors (note that zero skipping is
+C       effective, because of the condition on PMI(I) above):
+         IF (NHITOT .LT. MXPMHI) THEN
+            NHITOT = NHITOT + 1
+            IPMHIT(NHITOT) = I
+            TIMHIT(NHITOT) = TPM(I)
+            CPHINT(NHITOT) = PMI(I)
+            NPEINT(NHITOT) = NPELEC
+            PHPPMH(NHITOT) = PHPATH
+            ANGPMH(NHITOT) = RLAMBD
+            BETPMH(NHITOT) = BETA
+            IPAHIT(NHITOT) = IPART
+         ELSE
+            WRITE(6,*) ' '
+            WRITE(6,*) '*** NUCERL: More than ',MXPMHI,' PM-tube hits!'
+         ENDIF
+C
+  110 CONTINUE
+C
+  830 FORMAT(' '/' ','*** ERROR in NUCERL:'/' ','*** COSLAM = ',F7.3/
+     +           ' ','*** (Adjusted to ',F4.1,')')
+C
+      RETURN
+C
+  999 CONTINUE
+      WRITE(6,*)'*** ERROR in NUCERL: *** Jump to 999 ***'
+C
+       RETURN
+       END
++DECK,NUSHOU.
+      SUBROUTINE NUSHOU
+C----------------------------------------------
+C  Routine to store showers in shower library
+C----------------------------------------------
+C
++CDE,NULINK.
++CDE,NUZZIO.
++CDE,NUSHLC.
++CDE,MYSHOC.
++CDE,NUBANK.
++CDE,NUMISC.
++CDE,NUZLIN.
+C
+      CHARACTER*8 CHTAG(2)
+      DIMENSION KEYDIR(2),KEYSH(2)
+      DATA CHTAG/'Index   ','DUMMY   '/
+      DATA KEYDIR/-1,-1/
+C
+      DATA INIT/0/
+C
+      IF ( INIT .EQ. 0 ) THEN
+        INIT = 1
+        CHDIR = 'LUN61'
+        CALL RZOPEN(61,CHDIR,SHOFIL,'1X',1024,ISTAT)
+        IF ( ISTAT .NE. 0 ) THEN
+C          WRITE(6,*)'Open old file failed; try to open new file.'
+          CALL RZOPEN(61,CHDIR,SHOFIL,'1NX',1024,ISTAT)
+          IF ( ISTAT .NE. 0 ) THEN
+C            WRITE(6,*)'RZOPEN failed in NUSHOU!'
+            RETURN
+          ENDIF
+          CALL RZMAKE(61,'LUN61',2,'II',CHTAG,1000,'X')
+          CALL MZBOOK(IXSTOR,JZSDIR,JZSDIR,1,'SDIR',1,1,1001
+     *               ,IOSDIR,0)
+        ELSE
+          CALL RZFILE(61,'LUN61','1X')
+          CALL RZIN(IXSTOR,JZSDIR,1,KEYDIR,9999,' ')
+        ENDIF
+        CALL RZLOGL(61,2)
+      ENDIF
+C
+      IQN(JZSDIR+1) = IQN(JZSDIR+1) + 1
+      NSH = IQN(JZSDIR+1)
+      NWDIR = IQN(JZSDIR-1)
+      IF ( 2*NSH+1 .GT. NWDIR ) THEN
+        CALL MZPUSH(IXSTOR,JZSDIR,0,1000,'I')
+      ENDIF
+       QN(JZSDIR+2*NSH) = EMU0
+      IQN(JZSDIR+2*NSH+1) = NSH
+C
+      NBZ = -1
+      NBTH = -1
+      PHMIN = 100.0
+      DO 10 IZ = 1,MXEBIN
+        DO 20 IT = 1,MXTBIN
+          IF ( SHPHOT(IZ,IT) .GT. PHMIN ) THEN
+            NBE = IZ
+            IF ( IT .GT. NBTH ) THEN
+              NBTH = IT
+            ENDIF
+          ENDIF
+   20   CONTINUE
+   10 CONTINUE
+c      WRITE(6,*)'NBZ,NBTH = ',NBZ,NBTH
+      IF (( NBZ .LE. 0 ) .OR. ( NBTH .LE. 0 ) ) THEN
+c        WRITE(6,*)'Too small shower!'
+        NBZ = 10
+        NBTH = 10
+      ENDIF
+      NWSH = NBZ*NBTH +6
+      CALL MZBOOK(IXSTOR,JZSHHI,JZSHHI,1,'SHHI',1,1,NWSH,IOSHHI,0)
+       QN(JZSHHI+1) = EMU0
+      IQN(JZSHHI+2) = NBZ
+      IQN(JZSHHI+3) = NBTH
+      IQN(JZSHHI+4) = 1
+C
+      DO 30 IZ = 1,NBZ
+        DO 40 IT = 1,NBTH
+          QN(6+(NBTH-1)*IZ+IT) = SHPHOT(IZ,IT)
+   40   CONTINUE
+   30 CONTINUE
+C
+      KEYSH(1) = IQN(JZSDIR+2*NSH+1)
+      KEYSH(2) = 0
+      CALL RZOUT(IXSTOR,JZSHHI,KEYSH,ICYCLE,'W')
+C
+      RETURN
+      END
++DECK,NBINZ.
+          INTEGER FUNCTION NBINZ(D)
+C
++CDE,NUSHLC.
+C
+      DATA ICALL/0/
+C
+          IF ( ICALL .EQ. 0 ) THEN
+            ICALL = 1
+            ZBINN(0) = 0.0
+            ZBINN(1) = 50.0
+            ZBINN(2) = 100.0
+            ZBINN(3) = 150.0
+            ZBINN(4) = 200.0
+            ZBINN(5) = 300.0
+            ZBINN(6) = 450.0
+            ZBINN(7) = 600.0
+            ZBINN(8) = 800.0
+            ZBINN(9) = 1100.0
+            ZBINN(10) = 1500.0
+            ZBINN(11) = 2000.0
+            ZBINN(12) = 99999.9
+          ENDIF
+          NZBMAX = 11
+          NBINZ = NZBMAX + 1
+C
+          DO 10 IBINZ = 1,NZBMAX
+            IF ( D .LT. ZBINN(IBINZ) ) THEN
+              NBINZ = IBINZ
+              RETURN
+            ENDIF
+ 10       CONTINUE
+C
+          RETURN
+          END
++DECK,NBINTH.
+          INTEGER FUNCTION NBINTH(THEG)
++CDE,NUSHLC.
+          REAL THEG
+C
+          IF ( ICALL .EQ. 0 ) THEN
+            ICALL = 1
+            THBINN(0) = 0.0
+            THBINN(1) = 10.0
+            THBINN(2) = 20.0
+            THBINN(3) = 28.0
+            THBINN(4) = 33.0
+            THBINN(5) = 36.0
+            THBINN(6) = 39.0
+            THBINN(7) = 41.0
+            THBINN(8) = 42.0
+            THBINN(9) = 44.0
+            THBINN(10) = 47.0
+            THBINN(11) = 50.0
+            THBINN(12) = 55.0
+            THBINN(13) = 62.0
+            THBINN(14) = 70.0
+            THBINN(15) = 85.0
+            THBINN(16) = 180.0
+          ENDIF
+          NTBMAX = 15
+          NBINTH = NTBMAX + 1
+C
+C          IF ( THEG .GT. 180.0 ) THEN
+C            WRITE(6,*)'ERROR IN NBINTH: THEG = ',THEG
+C          ENDIF
+C
+          DO 10 IBINTH = 1,NTBMAX
+            IF ( THEG .LT. THBINN(IBINTH) ) THEN
+              NBINTH = IBINTH
+              RETURN
+            ENDIF
+ 10       CONTINUE
+C
+          RETURN
+          END
++DECK,NUSLIG. *************************************************************
+        SUBROUTINE NUSLIG(PVEC,PARMAS,X,Y,Z,TLENG,T0,OK)
+C----------------------------------------------------------------------
+C Special routine for shower lib.
+C
+C Start from the first Electron's track with GEANT
+C Called from GUSTEP to generate the secondary Cerenkov light, with
+C parametrization algorithm.
+C
+C
+C Transforms the coordinates of one point of the first electron's
+C track (we call it as a 'primary track') from the Lab to the IT's
+C own track system ( parallel moving + rotation )
+C
+C TLENG is the lenght of the track segment being considered (cm).
+C                                         AUTHOR  QIN SUN 931106
+C_______________________________________________________________________
+C
+C
+        INTEGER OK
+        REAL PVEC(3)
+        REAL AC
++CDE,NUFLAG.
++CDE,NUCPM.
++CDE,NUGRID.
++CDE,NUMISC.
++CDE,MYSHOC.
++CDE,NUSHLC.
+C
+C Pick up GEANT constants - pi and c, for example:
++CDE,GCONST.
+C
+C Pick up some other GEANT variables:
++CDE,GCKINE.
++CDE,GCTRAK.
+C
+C Fine structure constant:
+        PARAMETER (ALPHA = 1./137.036)
+        PARAMETER (AC = 1.0)
+C Z1 is a length of the primary track, in centimeter.
+        DIMENSION  COSTHE(MAXQQ),THE(MAXQQ),GX1(MAXQQ),
+     +           GY1(MAXQQ),GZ1(MAXQQ),
+     +           ACOPHI(MAXQQ),TOTQQ(MAXQQ),
+     +           DEGPHI(MAXQQ),COSPHI(MAXQQ)
+        INTEGER   NUMPHO,NUPHI
+C
+
+        DATA ICALL/0/
+C
+        SAVE
+
+C
+C                   IF (ICALL .GE. 0) THEN
+        BETAC  = 1./REFIND
+        CINMED = CLIGHT/REFIND
+        TWOPIA = TWOPI*ALPHA
+        CWTERM = 1./CWLGT1 - 1./CWLGT2
+
+C                   ENDIF
+
+C
+C PTOT2  is total momentum of the CURRENT track
+C Calculate  momentum components of primary and current track:
+C Current track: total momentum: PTOT2. The monmentum component in X axis
+C is as we calculated in the GUSTEP: PVEC(1)(-->Px) = VECT(4)*PTOT
+C For the current  track:
+        PVEX   = PVEC(1)
+        PVEY   = PVEC(2)
+        PVEZ   = PVEC(3)
+        SPVEC1 = PVEX*PVEX
+        SPVEC2 = PVEY*PVEY
+        SPVEC3 = PVEZ*PVEZ
+        SPTOT2 = SPVEC1 + SPVEC2 + SPVEC3
+        PTOT2  = SQRT(SPTOT2)
+        ETOT2  = SQRT(SPTOT2 + PARMAS*PARMAS)
+        BETA2  = PTOT2/ETOT2
+        IF ( PTOT2 .LT. 0. ) THEN
+          WRITE(6,*) 'PTOT2 .LT. 0.00!!'
+        ENDIF
+        COSCDX = PVEX/PTOT2
+        COSCDY = PVEY/PTOT2
+        COSCDZ = PVEZ/PTOT2
+C For each secondary point: ( as input values of X,Y,Z)
+        RADIUS = SQRT(X*X+Y*Y)
+        CALL HFILL(6662,RADIUS,Z,1.)
+        CALL HFILL (6664,X,Z,1.)
+C
+C The primary track:
+C PTOT1 is total momentum of primary track
+C DXPTRA, DYPTRA, DZPTRA are DIRECTION COSINE components of the primary track
+C
+C        COSAEX = DXPTRA(IPSTRA)
+C        COSAEY = DYPTRA(IPSTRA)
+C        COSAEZ = DZPTRA(IPSTRA)
+
+        COSAEX = DXPTRA(IPS)
+        COSAEY = DYPTRA(IPS)
+        COSAEZ = DZPTRA(IPS)
+
+        ETOT1(1) = SQRT(PTOT1(1)*PTOT1(1)
+     +                          + PEMAS1*PEMAS1)
+        BETA1  = PTOT1(1)/ETOT1(1)
+
+C 
+C The angle between primary and the current track is:
+
+C                     COSDIF = DXPTRA(IPSTRA)*COSCDX+DYPTRA(IPSTRA)*
+C     +                        COSCDY+DZPTRA(IPSTRA)*COSCDZ
+C
+C                     IF( ABS(COSDIF ).GE. 1.) THEN
+C                     WRITE(6,*) 'COSDIF .GE.1.0,= ',COSDIF
+C                     COSDIF = SIGN(1.,COSDIF)
+C                     ENDIF
+C                     ACODIF = ACOS(COSDIF)
+C                     DIFANG = COSDIF*RADDEG
+C                 write(6,*) 'angle between pri-current:', difang
+C            CALL HFILL (9292, DIFANG,0.,1.)
+C----   The Cherenkov angle : (from the current tracks)
+        COSANG = 1.0/(BETA2*REFIND)
+        IF( ABS(COSANG ).GE. 1.) THEN
+C          WRITE(6,*) 'COSANG .GE.1.0,= ',COSANG
+          COSANG = SIGN(1.,COSANG)
+        ENDIF
+
+        ANG = ACOS(COSANG)
+C transforms CHERNK to degree:
+
+        DECHNK = RADDEG*ANG
+C      WRITE(6,*) 'COSANG,DECHNK=',COSANG,DECHNK
+        IF (BETA1 .LE. BETAC) GOTO 999
+        IF (BETA2 .LE. BETAC) GOTO 999
+C
+C    Number of Cherenkov photons, with wavelength between CWLGT1
+C    and CWLGT2, emitted per centimetre along the current track
+C    (the factor 1.E7 is a conversion from nm to cm):
+C   (Only one cone is calculated:)
+
+        REFBET     = REFIND*BETA2
+        BNTERM     = (1. - 1./REFBET)*(1.+ 1./REFBET)
+        QQ         = TWOPIA*BNTERM*CWTERM
+        QQ         = QQ*1.E7
+        NUMPHO     = INT(QQ)
+        CHPHEV     = CHPHEV + QQ*TLENG
+        CALL HFILL(5554,CHPHEV,0.,1.)
+        IF (QQ .LT. 0.) THEN
+          WRITE(6,*) ' '
+          WRITE(6,*) 'NUSLIB: Negative # photos per cm: QQ =',
+     +                        QQ
+          WRITE(6,*) '*** (Setting QQ = 0.)'
+          QQ = 0.0
+          NUMPHO = 0
+
+        ENDIF
+C
+
+        IF (NUMPHO .GT. MAXQQ) THEN
+          WRITE(6,*) ' '
+          WRITE(6,*) '*** NUSLIB:'
+          WRITE(6,*) '*** NUMPHO > MAXQQ: ',NUMPHO,' ,',MAXQQ
+          WRITE(6,*) '*** SETTING NUMPHO = MAXQQ'
+          NUMPHO = MAXQQ
+        ENDIF
+
+
+C Define direction cosine of new coordinates:( in the current track system)
+C NEW X1's axis presented in old coordinate: We just consider the positive
+C consines --- chose the simplest way for calculate the angular distribution
+C in the positive Z's axis.
+
+        AA     = COSCDY*COSAEZ - COSCDZ*COSAEY
+        BB     = COSCDZ*COSAEX - COSCDX*COSAEZ
+        CC     = COSCDX*COSAEY - COSCDY*COSAEX
+        SQRABC = SQRT(AA*AA + BB*BB + CC*CC)
+C If the angle between primary and the secondary tracks is CLOSE to eachother,
+C then the new X axis is defined as the cross of the Z's axis in Lab.system and
+C the primary track is:
+        IF (SQRABC .LE. 1.0E-6) THEN
+          SQRTXY = SQRT(COSAEY*COSAEY+COSAEX*COSAEX)
+          IF (SQRTXY .LE. 1.0E-6) THEN
+            COSBEX = 1.
+            COSBEY = 0.
+            COSBEZ = 0.
+          ELSE
+C              WRITE(6,*) 'NUSLIG:SQRABC .LE. 0:'
+C              WRITE(6,*) 'COSAEX,COSAEY,COSAEZ=',COSAEX,COSAEY,COSAEZ
+C              WRITE (6,*) ' SQRABC =', SQRABC
+            COSBEX =  COSAEY/SQRTXY
+            COSBEY = -COSAEX/SQRTXY
+            COSBEZ =  0.
+          ENDIF
+        ELSE
+          COSBEX = AA/SQRABC
+          COSBEY = BB/SQRABC
+          COSBEZ = CC/SQRABC
+        ENDIF
+
+C NEW Y's axis presented in old coordinate, three components and direction
+C cosins are:
+
+        DD     = COSAEY*COSBEZ - COSAEZ*COSBEY
+        EE     = COSAEZ*COSBEX - COSAEX*COSBEZ
+       FF     = COSAEX*COSBEY - COSAEY*COSBEX
+        SQRDEF = SQRT(DD*DD + EE*EE + FF*FF)
+
+C        IF (SQRDEF .LE. 1.0E-6) THEN
+C          WRITE(6,*) 'SQRDEF=', SQRDEF
+C        ENDIF
+        COSGAX = DD/SQRDEF
+        COSGAY = EE/SQRDEF
+        COSGAZ = FF/SQRDEF
+
+
+C
+C Calculate the position of point C, use the direction of the current
+C track and selecte the length of AC is chosed as 1.0 centimeter.
+C COSACY is the angle between AC and the new Y's axis is:
+        COSACY = (COSCDX*COSGAX + COSCDY*COSGAY +
+     +                         COSCDZ *COSGAZ)
+        COSACZ = (COSCDX*COSAEX + COSCDY*COSAEY +
+     +                         COSCDZ *COSAEZ)
+        IF(COSACY .GE. 1.0) THEN
+          COSACY = 1.
+        ELSE
+          CX1 = 0.
+          CY1 = COSACY
+          CZ1 = COSACZ
+        ENDIF
+C  Calculate the constants :
+        NUM  = 100
+        XNUM = NUM
+        RRTAN   = TAN(ANG)*AC
+        PCQQ = QQ/XNUM
+C
+C       (UNIT:NANO.SECOND= SECONDS*1.0E+9)
+c
+        DO 11 I = 1,NUM+1
+          PHI = (I-1)*3.141592654/XNUM
+          CPHI = COS(PHI)
+          CPHI = COS(PHI)
+          CTHE = (CZ1+CY1*RRTAN*CPHI)*COSANG
+            IF (ABS(CTHE).GT. 1.0 ) THEN
+              DEGTHE(I) = 0.0
+            ELSEIF (CTHE .EQ. 1.0) THEN
+              DEGTHE(I) = 0.
+            ELSEIF (CTHE .LE. -1.) THEN
+              DEGTHE(I) = 180.
+            ELSE
+              THE(I) = ACOS(CTHE)
+              DEGTHE(I)  = THE(I)*RADDEG
+            ENDIF
+C
+          CALL HFILL (5550,DEGTHE(I),0.,PCQQ)
+C
+          IF ( ABS((Z-ZPRTRA(1))-500.0) .LT. 50. ) THEN
+            CALL HFILL(5553,DEGTHE(I),TOFG*1E9,PCQQ)
+          ENDIF
+          CALL HFILL(6661,DEGTHE(I),Z-ZPRTRA(1),PCQQ)
+C
+
+            IBINZ  = NBINZ(Z)
+            IBINTH = NBINTH(DEGTHE(I))
+
+            SHPHOT(IBINZ,IBINTH) =
+     &            SHPHOT(IBINZ,IBINTH) + PCQQ
+            SHT(IBINZ,IBINTH) = SHT(IBINZ,IBINTH)
+     &             + TOFG*1E9
+            SHT2(IBINZ,IBINTH) = SHT2(IBINZ,IBINTH)
+     &             + (TOFG*1E9)*(TOFG*1E9)
+      
+
+   11   CONTINUE
+C
+CC        STOP
+        IF ( COSCDZ .LT. 0.1 ) THEN
+          CALL HFILL(5551,Z-ZPRTRA(1),0.,QQ*TLENG)
+        ELSE
+          TPROJ = TLENG*COSCDZ
+          IF ( TPROJ .LT. 5. ) THEN
+            CALL HFILL(5557,Z-ZPRTRA(1),0.,QQ*TLENG)
+          ELSE
+            NTLENG = NINT(TPROJ)
+            DO 73 JJ = 1,NTLENG
+              CALL HFILL(5557,Z-ZPRTRA(1)+FLOAT(JJ)
+     *                          ,0.,QQ/COSCDZ)
+   73       CONTINUE
+          ENDIF
+        ENDIF
+
+C          The factpr 1.e9 is converte seconds to nano.seconds
+        STIME = STIME + (TLENG/CLIGHT*BETA2)*1.E9
+        CALL HFILL (5552,Z-ZPRTRA(1),TOFG*1E9,1.)
+C
+C                     WRITE(6,*)'TOFG = ',TOFG
+
+
+  999   CONTINUE
+C
+        RETURN
+        END   
+           
++DECK,NBINZ,IF=NEVER.
+          INTEGER FUNCTION NBINZ(D)
+          NBINZ = 1
+          IF ((D .GT. 0.) .AND. (D.LT. 100.)) THEN
+            IBINZ  = 1
+          ELSEIF ((D.GE. 100.) .AND. (D.LT. 200.)) THEN
+            IBINZ  = 2
+          ELSEIF ((D.GE. 200.) .AND. (D.LT. 250.)) THEN
+            IBINZ  = 3
+          ELSEIF ((D.GE. 250.) .AND. (D.LT. 300.)) THEN
+            IBINZ  = 4
+          ELSEIF ((D.GE. 350.) .AND. (D.LT. 400.)) THEN
+            IBINZ  = 5
+          ELSEIF ((D.GE. 400.) .AND. (D.LT. 450.)) THEN
+            IBINZ  = 5
+          ELSEIF ((D.GE. 450.) .AND. (D.LT. 500.)) THEN
+            IBUNZ  = 6
+          ELSEIF ((D.GE. 500.) .AND. (D.LT. 550.)) THEN
+            IBINZ  = 7
+          ELSEIF ((D.GE. 550.) .AND. (D.LT. 600.)) THEN
+            IBINZ  = 8
+          ELSEIF ((D.GE. 600.) .AND. (D.LT. 650.)) THEN
+            IBINZ  = 9
+          ELSEIF ((D.GE. 650.) .AND. (D.LT. 750.)) THEN
+            IBINZ  = 10
+          ELSE
+            IBINZ = 1
+          ENDIF
+          NBINZ = IBINZ
+C
+C
+          RETURN
+          END
++DECK,NBINTH,IF=NEVER.
+          INTEGER FUNCTION NBINTH(THEG)
+          REAL THEG
+C
+          IF ( (THEG .GT. 0.) .AND. (THEG .LT. 10.)) THEN
+            IBINTH = 1
+          ELSEIF ((THEG .GE. 10.) .AND.(THEG .LT. 15.)) THEN
+            IBINTH = 3
+          ELSEIF ((THEG .GE. 15.) .AND.(THEG .LT. 20.)) THEN
+            IBINTH = 5
+          ELSEIF ((THEG .GE. 20.) .AND.(THEG .LT. 25.)) THEN
+            IBINTH = 7
+          ELSEIF ((THEG .GE. 25.) .AND.(THEG .LT. 30.)) THEN
+            IBINTH = 9
+          ELSEIF ((THEG .GE. 30.) .AND.(THEG .LT. 35.)) THEN
+            IBINTH = 10
+          ELSEIF ((THEG .GE. 35.) .AND.(THEG .LT. 40.)) THEN
+            IBINTH = 11
+          ELSEIF ((THEG .GE. 40.) .AND.(THEG .LT. 45.)) THEN
+            IBINTH = 12
+          ELSEIF ((THEG .GE. 45.) .AND.(THEG .LT. 50.)) THEN
+            IBINTH = 13
+          ELSEIF ((THEG .GE. 50.) .AND.(THEG .LT. 55.)) THEN
+            IBINTH = 14
+          ELSEIF ((THEG .GE. 55.) .AND.(THEG .LT. 60.)) THEN
+            IBINTH = 15
+          ELSEIF ((THEG .GE. 60.) .AND.(THEG .LT. 65.)) THEN
+            IBINTH = 13
+          ELSEIF ((THEG .GE. 65.) .AND.(THEG .LT. 70.)) THEN
+            IBINTH = 10
+          ELSEIF ((THEG .GE. 70.) .AND.(THEG .LT. 80.)) THEN
+            IBINTH = 9
+          ELSE
+            IBINTH = 1
+          ENDIF
+               NBINTH = IBINTH
+C
+C
+          RETURN
+          END                                                                  
++EOD.
++QUIT.
+
+

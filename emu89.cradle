@@ -1,0 +1,800 @@
++USE,IBM.                   Select machine.                                     
++USE,CERN.                  Switch on CERN flag.                                
++USE,*NA34CRA.              USE pilot-patch in NA34 cradle.                     
++EXE,*NA34CRA.              EXE pilot-patch in NA34 cradle.                     
++SELF.                      User changes to +KEEPs in NA34 PAM here             
+C---------------------------------------------------------------------          
+C                                                                               
+C                      I N F O R M A T I O N                                    
+C                                                                               
+C---------------------------------------------------------------------          
+C                                                                               
+C                Input from  S  RUNCARD  A:                                     
+C                                                                               
+C     TAPNAM:    Tape name (format A6)                                          
+C     COMMEN:    Comment (format A20)                                           
+C     FILEN:     Name of histogram file (format A8)                             
+C     MUDRAW:    Set to true if we want to save histos on file(format L1        
+C     ZBKFMS(1): Set to false if raw data format (format L1)                    
+C     MUFLAG:    Muon flag (format L1)                                          
+C     ELFLAG:    Electron flag (format L1)                                      
+C     DCFLAG:    Drift chamber flag (format L1)                                 
+C     PRITRI:    Print trigger information (format L1)                          
+C     PRILAB:    Print labels for 5 events (format L1)                          
+C     PRISCA:    Print scalers (format L1)                                      
+C     NINPTS:    # of inputs (1) (format I1)                                    
+C     NFILES:    # of input files (format I1)                                   
+C     NOTPTS:    # of outputs (1 OR 0) (format I1)                              
+C     JH:    Histogram flags (format 20*I1)                                     
+C     BCENTR:    Magnetic field - muon magnet (format F10.5)                    
+C     NREPIN:    # of events to analyze (format I5)                             
+C    (JLEVEN:    The event counter)                                             
+C     NREP:      # of muon events to analyze (format I5)                        
+C    (MUEVEN:    The muon event counter)                                        
+C     JDEBU:     The event to start with (format I5)                            
+C     JPRLVL:    not used                                                       
+C     NWRIT:     The # of events to write out (format I5)                       
+C     NBWRIT:    From which event to start output (format I5)                   
+C     NVFBTG:    Size of array IVFBTG (format I3)                               
+C     IVFBTG:    Which VFB trigger to use (format I3)                           
+C     NPRETG:    not used (format I3)                                           
+C     IPRETG:    not used (format I3)                                           
+C     NSPYTG:    not used (format I3)                                           
+C     ISPYTG:    not used (format I3)                                           
+C     PKICKM:    Magcal kick value (format F7.4)                                
+C                                                                               
+C---------------------------------------------------------------------          
+C                                                                               
+C                           T R A C K                                           
+C                                                                               
+C---------------------------------------------------------------------          
+C                                                                               
+C    TRAKMU(J,I,K): J=type of track measurement    (max 4)                      
+C                   I=track number                 (max 10)                     
+C                   K=track parameter              (max 25)                     
+C                                                                               
+C    NMU:           # of tracks                                                 
+C                                                                               
+C    J= 1         Track in muon spectrometer (before muon magnet)               
+C    J= 2         Track at target                                               
+C    J= 3         Track between magcal and dump                                 
+C    J= 4         Track in muon spectrometer (after muon magnet)                
+C                                                                               
+C    K= 1  (F)    Px in lab                                                     
+C    K= 2  (F)    Py in lab                                                     
+C    K= 3  (F)    Pz in lab                                                     
+C    K= 4  (F)    PT                                                            
+C    K= 5  (F)    P  in lab                                                     
+C    K= 6  (F)                                                                  
+C    K= 7  (F)    Closest distance to target                                    
+C    K= 8  (F)    Z at closest distance to z-axis                               
+C    K= 9  (I)    Quality flag                                                  
+C    K= 10 (I)    sign                                                          
+C    K= 11 (F)    alpha      (Z0=0)                                             
+C    K= 12 (F)    X0         X=ALPHA(Z-Z0)+X0                                   
+C    K= 13 (F)    beta       (Z0=0)                                             
+C    K= 14 (F)    Y0         Y=BETA (Z-Z0)+Y0                                   
+C    K= 15 (F)    Chi square/NDF                                                
+C    K= 16 (I)    Hodoscope flag                                                
+C    K= 17 (F)    Theta                                                         
+C    K= 18 (F)    Eta                                                           
+C    K= 19 (F)    Phi                                                           
+C    K= 20 (F)    J=1:  Mult. scattering angle error in one dimension           
+C                 J=2:  Error on track angles before dump using target          
+C                 J=3:  Energy loss in calorimeter                              
+C    K= 21 (F)    J=1:  x at ULAC front face                                    
+C                 J=2:  y at ULAC front face                                    
+C                 J=3:  R at ULAC front face                                    
+C    K= 22 (F)    J=1:  Mult. scattering angle in x=Alpha(J=3)-Alpha(J=1        
+C                 J=2:  Mult. scattering angle in y=Beta(J=3) -Beta(J=1)        
+C                 J=3:  Mult. scattering angle in space                         
+C                                                                               
+C---------------------------------------------------------------------          
+C                                                                               
+C    TRAKDC(J,I,K): J=type of track measurement    (max   5)                    
+C                   I=track number                 (max 100)                    
+C                   K=track parameter              (max  30)                    
+C                                                                               
+C    NDC:           # of tracks                                                 
+C                                                                               
+C    J= 1         Overall fit                                                   
+C    J= 2         Fit in DC2                                                    
+C    J= 3         Fit in DC3                                                    
+C    J= 4         Best fit for muons                                            
+C    J= 5         Best fit for electrons                                        
+C                                                                               
+C    K= 1  (F)    Px in lab                                                     
+C    K= 2  (F)    Py in lab                                                     
+C    K= 3  (F)    Pz in lab                                                     
+C    K= 4  (F)    PT                                                            
+C    K= 5  (F)    P  in lab                                                     
+C    K= 6  (F)                                                                  
+C    K= 7  (F)    Closest distance to target                                    
+C    K= 8  (F)    Z at closest distance to z-axis                               
+C    K= 9  (F)                                                                  
+C    K= 10 (I)    sign                                                          
+C    K= 11 (F)    alpha      (Z0=0)                                             
+C    K= 12 (F)    X0         X=ALPHA(Z-Z0)+X0                                   
+C    K= 13 (F)    beta       (Z0=0)                                             
+C    K= 14 (F)    Y0         Y=BETA (Z-Z0)+Y0                                   
+C    K= 15 (F)    Chi square/NDF                                                
+C    K= 16 (I)    Reconstruction flag (1-7)                                     
+C    K= 17 (F)    Theta                                                         
+C    K= 18 (F)    Eta                                                           
+C    K= 19 (F)    Phi                                                           
+C    K= 20 (F)                                                                  
+C    K= 21 (F)                                                                  
+C    K= 22 (F)                                                                  
+C                                                                               
+C---------------------------------------------------------------------          
+C                                                                               
+C    PDC(J,I,K): J=type of particle  (max   3)                                  
+C                I=track number      (max 100)                                  
+C                K=track parameter   (max  10)                                  
+C                                                                               
+C    PMU(I,K):   I=track number      (max  10)                                  
+C                K=track parameter   (max  10)                                  
+C                                                                               
+C    J= 1         e                                                             
+C    J= 2         mu                                                            
+C    J= 3         pi                                                            
+C                                                                               
+C    K= 1         Px    in cm                                                   
+C    K= 2         Py    in cm                                                   
+C    K= 3         Pz    in cm                                                   
+C    K= 4         E     in cm                                                   
+C    K= 5         P     in cm                                                   
+C    K= 6         mass                                                          
+C    K= 7         Theta in cm                                                   
+C    K= 8         Eta   in cm                                                   
+C    K= 9         Y     in cm                                                   
+C    K= 10        XF    in cm                                                   
+C                                                                               
+C                                                                               
+C---------------------------------------------------------------------          
+C                                                                               
+C       Reconstruction flag = 1       DC1 & not DC2 & not DC3                   
+C                             2   not DC1 &     DC2 & not DC3                   
+C                             3   not DC1 & not DC2 &     DC3                   
+C                             4   not DC1 &     DC2 &     DC3                   
+C                             5       DC1 & not DC2 &     DC3                   
+C                             6       DC1 &     DC2 & not DC3                   
+C                             7       DC1 &     DC2 &     DC3                   
+C                                                                               
+C---------------------------------------------------------------------          
+C                                                                               
+C                                                                               
++SELF.                      User +KEEPs here                                    
++KEEP,MYCOUN.                                                                   
+       COMMON/MYCOUN/JLEVN1,NVINT,NMT,NHEAD,JTAPE,NEE,NEMU,HHOUT                
+        LOGICAL HHOUT                                                           
++KEEP,EMUCOM.                                                                   
+      INTEGER DAXCUT,EDACUT,ESICUT,EDCCUT,ESDCUT,ESPCUT                         
+      PARAMETER ( MAXLEP = 6 )                                                  
+      PARAMETER ( MAXCUT = 30)                                                  
+      PARAMETER ( NOCUT  = 1 )                                                  
+      PARAMETER ( EDCCUT = 2 )                                                  
+      PARAMETER ( DAXCUT = 3 )                                                  
+      PARAMETER ( EDACUT = 4 )                                                  
+      PARAMETER ( MDCCUT = 5 )                                                  
+      PARAMETER ( MDPCUT = 6 )                                                  
+      PARAMETER ( MDSCUT = 7 )                                                  
+      PARAMETER ( ESICUT = 8 )                                                  
+      PARAMETER ( MSICUT = 9 )                                                  
+      PARAMETER ( ESDCUT = 10)                                                  
+      PARAMETER ( ESPCUT = 11)                                                  
+      PARAMETER ( EPDCUT = 12)                                                  
+      PARAMETER ( MSDCUT = 13)                                                  
+      PARAMETER ( MSPCUT = 14)                                                  
+      PARAMETER ( EORCUT = 15)                                                  
+      PARAMETER ( MORCUT = 16)                                                  
+      PARAMETER ( MASCUT = 17)                                                  
+      PARAMETER ( MISCUT = 18)                                                  
+      PARAMETER ( NLPCUT = 19)                                                  
+      PARAMETER ( NLCCUT = 20)                                                  
+      PARAMETER ( CONCUT = 21)                                                  
+      PARAMETER ( MULCUT = 22)                                                  
+C                                                                               
+      PARAMETER ( HICUT  = 22)                                                  
+C                                                                               
+      COMMON/EMUCOM/NELE,PELE(4,MAXLEP),TRAKE(4,MAXLEP),SIGNE(MAXLEP)           
+     *             ,EECUT(MAXCUT,MAXLEP),I7807E(MAXLEP),MDCE(MAXLEP)            
+     *             ,RDCE(MAXLEP),MDCMU(MAXLEP),RDCMU(MAXLEP)                    
+     *             ,NPAIR(-1:1,-1:1),NPCUT(MAXCUT,-1:1,-1:1)                    
+     *             ,SIGNMU(MAXLEP),I7807M(MAXLEP),SDCMU(MAXLEP)                 
+     *             ,DPDCMU(MAXLEP),USEDC(100),EIMPAC(MAXLEP)                    
+     *             ,MIMPAC(MAXLEP),ACTIVE(MAXCUT)                               
+     *             ,SIDXE(MAXLEP),SIDXMU(MAXLEP),ISPE(MAXLEP)                   
+     *             ,ISPMU(MAXLEP),ISPE2(MAXLEP),EULE(MAXLEP)                    
+     *             ,PDCE(MAXLEP),SPDXE(MAXLEP),SPDYE(MAXLEP)                    
+     *             ,CDXDC(MAXLEP),CDYDC(MAXLEP)                                 
+     *             ,CDXEC(MAXLEP),CDYEC(MAXLEP)                                 
+     *             ,XECMAG(MAXLEP),YECMAG(MAXLEP)                               
+      LOGICAL EECUT,USEDC,ACTIVE                                                
+      REAL MIMPAC                                                               
+      COMMON/EMUCUT/CUTVAL(3,MAXCUT)                                            
+C                                                                               
+CCCCC*CCCCCCCCCCCCC,NMU,PMU(4,MAXLEP),TRAKMU(4,MAXLEP),SIGNMU(MAXLEP)           
+      INTEGER SIGNE,SIGNMU,SDCMU                                                
++KEEP,EMUMSI.                                                                   
+      COMMON/EMUMSI/NSIHE(MAXLEP),PR12E(MAXLEP),RESE(MAXLEP)                    
+     *             ,NSIHMU(MAXLEP),PR12MU(MAXLEP),RESMU(MAXLEP)                 
+     *             ,NDCOK(MAXLEP)                                               
+      LOGICAL NDCOK                                                             
+C---------------------------------------------------------------------          
+C                       MYINFO                                                  
+C---------------------------------------------------------------------          
++KEEP,MYINFO. My event information                                              
+      COMMON/MYCOU2/ JLEVEN,MUEVEN,NREPIN,NREP,JDEBU,JPRLVL,NWRIT,              
+     *               NBWRIT,NTAPES,NFILES,NCUT(24,10),XCUT(24)                  
+     *              ,OLDSIG,OLDEVT,NEWSIG,OLDNOI,NEWNOI                         
+      LOGICAL XCUT                                                              
+      INTEGER OLDSIG,OLDEVT,OLDNOI                                              
+      COMMON/MYVALU/ PKICKM,ETOT,VETOEN                                         
+                                                                                
+      COMMON/MYTITL/ T(9),COMMEN,FILEN                                          
+      CHARACTER*6    T                                                          
+      CHARACTER*32   COMMEN                                                     
+      CHARACTER*8    FILEN                                                      
+                                                                                
+      COMMON/MYCTRL/ MUFLAG,DSTFLG,ELFLAG,DCFLAG,NVFBTG,IVFBTG(10),             
+     *               PRITRI,NPRETG,IPRETG(10),                                  
+     *               PRILAB,NSPYTG,ISPYTG(10),                                  
+     *               FRPRE(32),VFBTOT(51),PRISCA,YEAR                           
+      LOGICAL   MUFLAG,DSTFLG,ELFLAG,DCFLAG,PRITRI,PRILAB,PRISCA,FRPRE          
+      INTEGER   VFBTOT,YEAR                                                     
+      COMMON/ZPOS/   ZTARG,ZM,ZSCIN,ZULAC,ZBEAM,ZVETO                           
+C---------------------------------------------------------------------          
+C                       HISTO                                                   
+C---------------------------------------------------------------------          
++KEEP,HISTO.   Histogram flags                                                  
+      COMMON/HISTO/JH(20),LH(20)                                                
+C---------------------------------------------------------------------          
+C                       KINEM                                                   
+C---------------------------------------------------------------------          
++KEEP,KINEM.   Kinematical constants                                            
+      COMMON/TLOR/TMB,TMT,TPBL,TPBC,TSS,TBET,TLOR(4)                            
+      COMMON/CONST/EM,EEM,MUM,MUMUM,PIM,KAM,PRM,ROM,PI,PI2                      
+      REAL MUM,MUMUM,KAM                                                        
+C---------------------------------------------------------------------          
+C                       TRACK                                                   
+C---------------------------------------------------------------------          
++KEEP,TRACK.   TRACK BANK                                                       
+      COMMON/TRAKMU/  NMU,TRAKMU(4,10,25),PMU(10,10)                            
+      DIMENSION       IRAKMU(4,10,25)                                           
+      EQUIVALENCE    (TRAKMU(1,1,1),IRAKMU(1,1,1))                              
+      COMMON/TRACK/   NDC,TRAKDC(5,100,25),PDC(3,100,10)                        
+      DIMENSION       IRAKDC(5,100,25)                                          
+      EQUIVALENCE    (TRAKDC(1,1,1),IRAKDC(1,1,1))                              
+C---------------------------------------------------------------------          
+C                       MYSPAD                                                  
+C---------------------------------------------------------------------          
++KEEP,MYSPAD. MY SCINT. PAD INFO                                                
+      COMMON / MYSPDA / IRAWA(100),IRAWD(1024),JWDPM(80),ISCLOC(256),           
+     *                  ITEMP(256),IADC(80),IDISCR(4,80),XSCIL(80),             
+     *                  XSCIH(80),YSCIL(80),YSCIH(80),IVALX(80),                
+     *                  ICUT(80),JCUT(80),ISHIF(80),DOSHIF,                     
+     *                  IHIST(80),IDISUP(256),SCIFAN(256),ISCSP(256)            
+      LOGICAL SCIFAN,DOSHIF                                                     
++SELF.########  Schubi's  Si-pad commons #########################.             
++KEEP,SPIND.                                                                    
+      COMMON/SPIND/ SPSTAT(0:399),SPDIS1,SPDIS2,IHBK                            
+     +             ,INDX(0:399),INDY(0:399),IND2(-6:6,-30:30)                   
+C    Parameter in COMMON SPIND                                                  
+C     SPSTAT  :    Status of Pad 0=ok  1=dead  2=floating                       
+C     SPDIS1  :    Discriminator threshold single pulsehight, ADC counts        
+C     IHBK    :    histogram index offset of SI-Pad histos                      
+C                                                                               
++KEEP,SPCXMC.                                                                   
+      COMMON/SPCXMC/ NPXRAD(480),NPXRPN(0:399)                                  
+C    Parameter in COMMON SPCXMC                                                 
+C     NPXRAD(J) :  Pad number(TRIGGER BOOK) of Channel J in qADC labels         
+C                  Central Pads (0,100,200,300) N O T included                  
+C     NPXRPN(J) :  Channel in qADX labels of Pad NR J                           
+C                                                                               
+      PARAMETER ( NPBS = 4 )                                                    
+      PARAMETER ( NMBS = 3 )                                                    
++KEEP,SPIPDAT.                                                                  
+      COMMON/IPDAT/IPDCFS,IPDANA(0:399,0:NMBS),IPDN(0:NMBS)                     
+     +     ,IPDDI3(0:399),IPDPUL(0:399,NPBS),IPDAN2(0:399)                      
+     +                   ,IPDDIS(0:399),IPDDI2(0:399),IPDCLS                    
+     +             ,IMTH(0:NMBS),IPTH(NPBS+1),NANAL                             
++KEEP,SPADCOM.                                                                  
+      COMMON /PADCOM/ PADCFS,PADADC(480),PADDIS(76)                             
+     +      , IBITLO(38),IBITHI(38),ILODIS(480),IHIDIS(480)                     
+     +      , PADCLS,MULT1,MULT2                                                
+     +      , PADENT(0:399),PADVAL(0:399),PVALSQ(0:399)                         
+     +      , PADSCA(0:399),PADPED(0:399),PADSTD(0:399)                         
+      INTEGER PADADC,PADDIS,PADENT                                              
+C                                                                               
++SELF.##############################################################            
++PAM,12,R=CDECRA,T=HOLD.    Read NA34 cradle up to DECKCRA.                     
++PAM,13,R=GCDES.            Read Geant KEEPs                                    
+CPAM,17,T=ATTACH. SISTRIP PAM *                                                 
++PAM,11.                    Read NA34 PAM and rewind.                           
++PAM,12,T=RESUME.           Read rest of cradle and rewind.                     
++SELF.                      Changes to NA34 routines goes in here               
++SELF. : Make Sandra work with HBOOK4 :                                         
++USE,P=SALBMAIN,D=LBMAIN,IF=-MAKELIB.                                           
++EXE,P=SALBMAIN,D=LBMAIN,IF=-MAKELIB.                                           
++REP,P=SALBMAIN,D=LBMAIN,C=103. (HLIMIT)                                        
++REP,P=SALBMAIN,D=LBMAIN,C=106. (ZHINIT)                                        
+       CALL ZINIT(IZSFS1,ILBLNK,LENZBK)                                         
++SELF.                      If you make any, activate +PAM below                
+*                                                                               
++SELF.                                                                          
++PAM,11.                  Read NA34 PAM and rewind.                             
++SELF.******************************************************************        
++SELF.                                                                          
++PATCH,MYDECKS.                                                                 
+C **********************************************************************        
++DECK,MYINI.                                                                    
+C                                                                               
+      SUBROUTINE MYINI  (IRUNN)                                                 
+C                                                                               
++CDE,SIFLAG,SICOM.                                                              
++CDE,MYCOUN.                                                                    
+CCDE,MUSTAT.                                                                    
++CDE,MYINFO.                                                                    
++CDE,MUCOUN.                                                                    
++CDE,SABCOM.                                                                    
++CDE,SAZBID.                                                                    
++CDE,GCLINK.                                                                    
++CDE,SAPCTL.                                                                    
++CDE,SAIOCT.                                                                    
++CDE,DISET.                                                                     
++CDE,MUSTAT.                                                                    
++CDE,UGMUCD.                                                                    
++CDE,MUID.                                                                      
++CDE,HISTO.                                                                     
++CDE,MUGEOC.                                                                    
++CDE,MUGNET.                                                                    
++CDE,EMUCOM.                                                                    
+C                                                                               
+      COMMON/PAWC/HH(50000)                                                     
+C                                                                               
+       DIMENSION IKEEP(3)                                                       
+C                                                                               
+      CALL HLIMIT(50000)                                                        
+C                                                                               
+      HHOUT = .FALSE.                                                           
+CCCCC IF ( HHOUT ) THEN                                                         
+        CALL VMCMS('FILEDEF 1 DISK EMU HBOOK4 A6 (XTENT  50',IERR)              
+        OPEN(UNIT=1,FORM='UNFORMATTED',RECL=4096,ACCESS='DIRECT'                
+     *    ,STATUS='UNKNOWN')                                                    
+        CALL HRFILE(1,'EMU','N')                                                
+CCCCC ENDIF                                                                     
+C                                                                               
+C    (*** "Normal" Sandra init : ***)                                           
+C                                                                               
+C   NUMBER OF INPUTS:                                                           
+      NINPTS = 1                                                                
+C   NUMBER OF OUTPUTS:                                                          
+      NOTPTS = 0                                                                
+      CALL VMCMS('FILEDEF 47 DISK EMUE  ASCII A (LRECL 160',IERR)               
+      WRITE(47,*)'======================= Electrons ================'           
+      WRITE(47,*)' Event +-    Px       Py       Pz      E        RDC'          
+     *          ,'    Eulac     Pdc    Nhit Si  Carmit  Si dx  Impact'          
+     *          ,' SiP1 SiP2'                                                   
+      CALL VMCMS('FILEDEF 48 DISK EMUMU ASCII A (LRECL 120',IERR)               
+      WRITE(48,*)'======================= Muons ================'               
+      WRITE(48,*)' Event +-    Px       Py       Pz     RDC      dpdc'          
+     *          ,' +-DC    Nhit Si  Carmit  Si dx  Impact Mult Etot'            
+C                                                                               
+      ZBKFMS(1)= .TRUE.                                                         
+      EXPRTS(1)= .FALSE.                                                        
+C  INITIALIZE EVENT COUNTER                                                     
+       JLEVN1=0                                                                 
+       JTAPE = 1                                                                
+       NVINT = 0                                                                
+       NMT   = 0                                                                
+       NEE   = 0                                                                
+       NHEAD = 0                                                                
+       NEMU  = 0                                                                
+C  SET TIME LIMIT                                                               
+       TQUIT=  5.0                                                              
+C                                                                               
+      CALL KINMAT                                                               
+C---------------------------------------------------------------------          
+C     Set cuts for emu-pairs                                                    
+C---------------------------------------------------------------------          
+      DO 92 JJ=1,MAXCUT                                                         
+        ACTIVE(JJ) = .FALSE.                                                    
+        CUTVAL(1,JJ) = 99999.                                                   
+        CUTVAL(2,JJ) = 99999.                                                   
+        CUTVAL(3,JJ) = 99999.                                                   
+ 92   CONTINUE                                                                  
+      ACTIVE( NOCUT) = .TRUE.                                                   
+      ACTIVE(DAXCUT) = .FALSE.                                                  
+      ACTIVE(EDCCUT) = .TRUE.                                                   
+      ACTIVE(EDACUT) = .TRUE.                                                   
+      ACTIVE(MDCCUT) = .TRUE.                                                   
+      ACTIVE(MDSCUT) = .FALSE.                                                  
+      ACTIVE(MDPCUT) = .TRUE.                                                   
+      ACTIVE(ESICUT) = .FALSE.                                                  
+      ACTIVE(MSICUT) = .FALSE.                                                  
+      ACTIVE(ESDCUT) = .FALSE.                                                  
+      ACTIVE(MSDCUT) = .FALSE.                                                  
+      ACTIVE(ESPCUT) = .FALSE.                                                  
+      ACTIVE(EPDCUT) = .FALSE.                                                  
+      ACTIVE(MSPCUT) = .FALSE.                                                  
+      ACTIVE(EORCUT) = .FALSE.                                                  
+      ACTIVE(MORCUT) = .FALSE.                                                  
+      ACTIVE(MASCUT) = .FALSE.                                                  
+      ACTIVE(MISCUT) = .FALSE.                                                  
+      ACTIVE(NLPCUT) = .FALSE.                                                  
+      ACTIVE(NLCCUT) = .FALSE.                                                  
+      ACTIVE(CONCUT) = .FALSE.                                                  
+      ACTIVE(MULCUT) = .TRUE.                                                   
+CCCCC CUTVAL(1,EDCCUT) = 1.0                                                    
+C     CUTVAL(1,EDACUT) = 2.5                                                    
+C     CUTVAL(1,MDCCUT) = 2.1                                                    
+C     CUTVAL(1,MDSCUT) = +1.                                                    
+C     CUTVAL(1,MDPCUT) = 2.5                                                    
+C     CUTVAL(1,ESICUT) = 0.0600                                                 
+C     CUTVAL(2,ESICUT) = 3.0                                                    
+C     CUTVAL(1,MSICUT) = 0.0600                                                 
+CCCCC CUTVAL(2,MSICUT) = 3.0---------                                           
+      CUTVAL(1,EDCCUT) = 1.5                                                    
+      CUTVAL(1,DAXCUT) = 0.8                                                    
+      CUTVAL(2,DAXCUT) = 1.5                                                    
+      CUTVAL(1,EDACUT) = 3.5                                                    
+      CUTVAL(1,MDCCUT) = 4.5                                                    
+      CUTVAL(1,MDSCUT) = +1.                                                    
+      CUTVAL(1,MDPCUT) = 4.5                                                    
+      CUTVAL(1,ESICUT) = 1.0600                                                 
+      CUTVAL(2,ESICUT) = 2.0                                                    
+      CUTVAL(1,MSICUT) = 1.0600                                                 
+      CUTVAL(2,MSICUT) = 2.0                                                    
+      CUTVAL(1,ESDCUT) = 0.50                                                   
+      CUTVAL(1,MSDCUT) = 0.50                                                   
+      CUTVAL(1,ESPCUT) = 0.0950                                                 
+      CUTVAL(2,ESPCUT) = 0.3                                                    
+      CUTVAL(1,MSPCUT) = 0.0650                                                 
+      CUTVAL(2,MSPCUT) = 0.3                                                    
+      CUTVAL(1,MASCUT) = 0.200                                                  
+      CUTVAL(2,MASCUT) = 2.200                                                  
+      CUTVAL(1,MISCUT) = 430.                                                   
+      CUTVAL(1,NLPCUT) = 2.0                                                    
+      CUTVAL(2,NLPCUT) = 2.0                                                    
+      CUTVAL(3,NLPCUT) = 1.0                                                    
+      CUTVAL(1,NLCCUT) = 2.0                                                    
+      CUTVAL(2,NLCCUT) = 2.0                                                    
+      CUTVAL(1,CONCUT) = 1.0                                                    
+      CUTVAL(2,CONCUT) = 1.5                                                    
+      CUTVAL(1,MULCUT) = 15.5                                                   
+C                                                                               
+C---------------------------------------------------------------------          
+C     Call the muon data routine (MUREC)                                        
+C---------------------------------------------------------------------          
+CCCC   MUDRAW=.FALSE.                                                           
+       CALL MUDATA                                                              
+C---------------------------------------------------------------------          
+C      Read input values from runcard file                                      
+C---------------------------------------------------------------------          
+      M =  5                                                                    
+      READ(M,120) (T(I),I=1,9)                                                  
+      READ(M,121) COMMEN                                                        
+      READ(M,122) FILEN                                                         
+      READ(M,110) MUDRAW                                                        
+      READ(M,110) ZBKFMS(1)                                                     
+      READ(M,110) MUFLAG                                                        
+      READ(M,110) DSTFLG                                                        
+      READ(M,110) ELFLAG                                                        
+      READ(M,110) DCFLAG                                                        
+      READ(M,110) PRITRI                                                        
+      READ(M,110) PRILAB                                                        
+      READ(M,110) PRISCA                                                        
+      READ(M,101) NTAPES                                                        
+      READ(M,101) NFILES                                                        
+      READ(M,101) NOTPTS                                                        
+      READ(M,49)  (JH(I),I=1,20)                                                
+      READ(M,50)  BCENTR,NREPIN,NREP,JDEBU,JPRLVL,                              
+     *            NWRIT,NBWRIT                                                  
+      READ(M,51)  NVFBTG,(IVFBTG(I),I=1,NVFBTG)                                 
+      READ(M,51)  NPRETG,(IPRETG(I),I=1,NPRETG)                                 
+      READ(M,51)  NSPYTG,(ISPYTG(I),I=1,NSPYTG)                                 
+      READ(M,52)  PKICKM                                                        
+      READ(M,55)  (XCUT(I),I=1,24)                                              
+C---------------------------------------------------------------------          
+C   FORMAT statements for READ                                                  
+C---------------------------------------------------------------------          
+  120 FORMAT(/,10X,9(A6,1X),/)                                                  
+  121 FORMAT(50X,A20)                                                           
+  122 FORMAT(50X,A8,/)                                                          
+  110 FORMAT(50X,L1)                                                            
+  101 FORMAT(50X,I1)                                                            
+   49 FORMAT(/,/,20(/,50X,I1))                                                  
+   50 FORMAT(/,50X,F10.5,/,/,50X,I5,/,50X,I5,/,50X,I5,                          
+     *       /,50X,I5,/,50X,I5,/,50X,I5,/)                                      
+   51 FORMAT(50X,10(I3,1X))                                                     
+   52 FORMAT(/,50X,F7.4,/)                                                      
+   55 FORMAT(/,24(/,50X,L1))                                                    
+C---------------------------------------------------------------------          
+C      Print values from runcard file                                           
+C---------------------------------------------------------------------          
+      WRITE(6,200) COMMEN                                                       
+      WRITE(6,201) (T(I),I=1,NTAPES)                                            
+      WRITE(6,202) NFILES                                                       
+      WRITE(6,210) MUDRAW,ZBKFMS(1),MUFLAG,DSTFLG,ELFLAG,DCFLAG,PRITRI,         
+     *             PRILAB,PRISCA                                                
+      WRITE(6,103) (JH(I),I=1,20)                                               
+      WRITE(6,599) NREPIN,NREP,JDEBU,JPRLVL,NWRIT,NBWRIT                        
+      WRITE(6,600) (IVFBTG(I),I=1,NVFBTG)                                       
+      WRITE(6,603) PKICKM,BCENTR                                                
+C---------------------------------------------------------------------          
+C   FORMAT statements for WRITE                                                 
+C---------------------------------------------------------------------          
+  200 FORMAT(1X,60('*'),//,5X,'COMMENT:',7X,A20)                                
+  201 FORMAT(/,5X,'INPUT TAPES:',3X,9(A6,1X))                                   
+  202 FORMAT(/,5X,'NUMBER OF FILES PER TAPE:',I3,/)                             
+  210 FORMAT(1X,60('*'),/,1X,'MUDRAW = ',L1,/,                                  
+     *                    1X,'ZBKFMS = ',L1,/,                                  
+     *                    1X,'MUFLAG = ',L1,/,                                  
+     *                    1X,'DSTFLG = ',L1,/,                                  
+     *                    1X,'ELFLAG = ',L1,/,                                  
+     *                    1X,'DCFLAG = ',L1,/,                                  
+     *                    1X,'PRITRI = ',L1,/,                                  
+     *                    1X,'PRILAB = ',L1,/,                                  
+     *                    1X,'PRISCA = ',L1)                                    
+  103 FORMAT(1X,60('*'),/,1X,'JH= ',20I1)                                       
+  599 FORMAT(1X,60('*'),/,5X,                                                   
+     *    5X,'NREP(JLEVEN)=',I5,5X,'NREP(MUEVEN)=',I5,/,                        
+     *    5X,'JDEBU=',I5,5X,'JPRLVL=',I5,/,                                     
+     *    5X,'NWRIT=',I5,5X,'NBWRIT=',I5)                                       
+  600 FORMAT(1X,60('*'),/,1X,'TEST OF VFB TRIGGER #    : ',10(I3,5X))           
+  603 FORMAT(1X,60('*'),/,                                                      
+     *  1X,'              MAGCAL KICK VALUE:   ',F7.4,/,                        
+     *  1X,'              MUON MAGNETIC FIELD: ',F7.4,/)                        
+C---------------------------------------------------------------------          
+C  The vector errors are in JERROR and dimensioned to 20.                       
+C  The first group of errors is for siren label error.                          
+C  That vector is in the common MYINFO.                                         
+C---------------------------------------------------------------------          
+      CALL VZERO(JERROR,20)                                                     
+      CALL VZERO(NCUT,240)                                                      
+      CALL VZERO(VFBTOT,51)                                                     
+C---------------------------------------------------------------------          
+C   Fill the common MUGEOC with data describing the mu spectrometer             
+C   GEODAT is local routine                                                     
+C---------------------------------------------------------------------          
+      CALL GEODAT                                                               
+*                                                                               
+* * >  SET SOME SI... FLAGS                                                     
+*                                                                               
+       USEPL1     = .TRUE.                                                      
+       USEPL2     = .TRUE.                                                      
+       USEPL3     = .TRUE.                                                      
+       RAWDP1     = .FALSE.                                                     
+       RAWDP2     = .FALSE.                                                     
+       RAWDP3     = .FALSE.                                                     
+       XTPED1     = .FALSE.                                                     
+       XTPED2     = .FALSE.                                                     
+       XTPED3     = .FALSE.                                                     
+       PEDDMP     = .FALSE.                                                     
+       CALDMP     = .FALSE.                                                     
+       ADCDP1     = .FALSE.                                                     
+       ADCDP2     = .FALSE.                                                     
+       ADCDP3     = .FALSE.                                                     
+       STRDP1     = .FALSE.                                                     
+       STRDP2     = .FALSE.                                                     
+       STRDP3     = .FALSE.                                                     
+*                                                                               
+* * > SET FLAGS FOR SVERKER'S PART (+CDE,SICOM.)                                
+*                                                                               
+      MCSI      = .FALSE.                                                       
+      HITREC    = .TRUE.                                                        
+      TRKREC    = .TRUE.                                                        
+      VTXREC    = .TRUE.                                                        
+      MCDEB     = .FALSE.                                                       
+      ANHIST    = .FALSE.                                                       
+      DEBHIS    = .FALSE.                                                       
+      STRHIS    = .FALSE.                                                       
+      EVHIST    = .FALSE.                                                       
+      LUCTRK    = .FALSE.                                                       
+      SDEBUG    = .FALSE.                                                       
+      NLIPOL    = .TRUE.                                                        
+      OLDHB     = .FALSE.                                                       
+      PRNTSI    = .FALSE.                                                       
+*                                                                               
+* * >  Choose cut                                                               
+*                                                                               
+      CHITRC = 99.                                                              
+*                                                                               
+* * >  Initialize Si-strip package                * *                           
+*                                                                               
+       CALL SIINIT (880707)                                                     
+*                                                                               
+C---------------------------------------                                        
+C   Si-pad init a la Schubi :                                                   
+C---------------------------------------                                        
+C                                                                               
+      CALL SPINIT(1)                                                            
+C                                                                               
+* *> Initialize Scalers                                                         
+      CALL FRSCAL( -1 )                                                         
+C                                                                               
+      JLEVEN = 0                                                                
+      MAXEVT = 100000                                                           
+C                                                                               
+      NPAIR(-1,-1) = 0                                                          
+      NPAIR( 1,-1) = 0                                                          
+      NPAIR(-1, 1) = 0                                                          
+      NPAIR( 1, 1) = 0                                                          
+      DO 58 JJ=NOCUT,MAXCUT                                                     
+        NPCUT(JJ,-1,-1) = 0                                                     
+        NPCUT(JJ, 1,-1) = 0                                                     
+        NPCUT(JJ,-1, 1) = 0                                                     
+        NPCUT(JJ, 1, 1) = 0                                                     
+ 58   CONTINUE                                                                  
+C---------------------------------------------------------------------          
+C   Book histograms                                                             
+C---------------------------------------------------------------------          
+      CALL MYBOOK                                                               
+C                                                                               
+      OLDSIG = 0                                                                
+      OLDEVT = 0                                                                
+      RETURN                                                                    
+      END                                                                       
+C                                                                               
+* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX                     
+C                                                                               
++DECK,MYEVNT.                                                                   
+C                                                                               
+      SUBROUTINE MYEVNT(ISTAT)                                                  
+C                                                                               
+C---------------------------------------------------------------------          
+C                                                                               
+C                        C O M M O N S                                          
+C                                                                               
+C---------------------------------------------------------------------          
++CDE,MYINFO.                                                                    
++CDE,TRACK.                                                                     
++CDE,MUCOUN.                                                                    
++CDE,MUSTAT.                                                                    
++CDE,MUID.                                                                      
++CDE,HISTO.                                                                     
++CDE,MUGEOC.                                                                    
++CDE,MUGNET.                                                                    
++CDE,SAUNUM.                                                                    
++CDE,SABCOM.                                                                    
++CDE,SAEVWR.                                                                    
++CDE,SAZBID.                                                                    
++CDE,SAPCTL.                                                                    
++CDE,SAIOCT.                                                                    
++CDE,GCLINK.                                                                    
++CDE,DISET.                                                                     
++CDE,UGMUCD.                                                                    
++CDE,EMUCOM.                                                                    
+C---------------------------------------------------------------------          
+C                                                                               
+C                      D E C L A R A T I O N S                                  
+C                                                                               
+C---------------------------------------------------------------------          
+      DIMENSION XBUF(751),IKEEP(30),IBUF(751)                                   
+      EQUIVALENCE (XBUF,IBUF)                                                   
+      LOGICAL TRIGC,BSCIC,ETOTC,SIC,SCIC,CONC,DCCUT,MUCUT,MUHODC                
+      LOGICAL MUPAIR,FRVFB                                                      
+      CHARACTER*45 ANBRUN                                                       
+C---------------------------------------------------------------------          
+C                                                                               
+C                      I N I T I A L I Z A T I O N                              
+C                                                                               
+C---------------------------------------------------------------------          
+      LWREVT = .FALSE.                                                          
+C---------------------------------------------------------------------          
+C    Check if there is a run header and create titles for the histos            
+C---------------------------------------------------------------------          
+      IF( LBLENG(210 05).NE.0 )THEN                                             
+        WRITE(6,*) ' START OF RUN'                                              
+        CALL FRHEAD(IYMD,IHM,NBRUN)                                             
+        WRITE(ANBRUN,997) NBRUN,IYMD,IHM                                        
+  997   FORMAT('RUN NUMBER: ',I6,' DATE AND TIME: ',I6,1X,I4)                   
+        CALL HTITLE(COMMEN//ANBRUN)                                             
+        IF(IYMD.GE.870101.AND.IYMD.LE.871231) YEAR=1987                         
+        IF(IYMD.GE.880101.AND.IYMD.LE.881231) YEAR=1988                         
+        RETURN                                                                  
+      ENDIF                                                                     
+C---------------------------------------------------------------------          
+C    VFB triggers                                                               
+C---------------------------------------------------------------------          
+      IF(PRITRI.AND.LBLENG(21504).NE.0) THEN                                    
+        CALL LBAPRT(21504)                                                      
+      ENDIF                                                                     
+C---------------------------------------------------------------------          
+C    If this is an EOB, update the scalers                                      
+C---------------------------------------------------------------------          
+      IF( LBLENG(210 35).NE.0 ) THEN                                            
+        CALL FRSCAL( 0 )                                                        
+        RETURN                                                                  
+      ENDIF                                                                     
+C---------------------------------------------------------------------          
+C     Check if we have an event                                                 
+C---------------------------------------------------------------------          
+      IF( LBLENG(200 15).EQ.0 ) RETURN                                          
+C---------------------------------------------------------------------          
+C     Update event counter                                                      
+C---------------------------------------------------------------------          
+      JLEVEN = JLEVEN + 1                                                       
+C---------------------------------------------------------------------          
+C     If we have enough events stop                                             
+C---------------------------------------------------------------------          
+CCCC  IF(JLEVEN.GE.NREPIN) ISTAT = -1                                           
+C---------------------------------------------------------------------          
+C     Is this the event to start with ?                                         
+C---------------------------------------------------------------------          
+      IF(JLEVEN.LT.JDEBU) RETURN                                                
+C!!!!!!!!!!!!!!!!!!!!!!!!                                                       
+CCCCC IF ( JLEVEN-OLDEVT .LT. 300 ) RETURN                                      
+C!!!!!!!!!!!!!!!!!!!!!!!!                                                       
+C---------------------------------------------------------------------          
+C     Dump the labels for the first 5 events                                    
+C---------------------------------------------------------------------          
+      IF(PRILAB.AND.JLEVEN.LE.5) CALL LBLIST(1)                                 
+C---------------------------------------------------------------------          
+C                                                                               
+C                   S T A R T     A N A L Y S I S                               
+C                                                                               
+      IF ( .NOT. FRVFB(10) ) RETURN                                             
+C---------------------------------------------------------------------          
+C     Update event counter of good events                                       
+C---------------------------------------------------------------------          
+      MUEVEN = MUEVEN + 1                                                       
+C---------------------------------------------------------------------          
+C     Silicon strips and vertex                                                 
+C---------------------------------------------------------------------          
+CCCCC   CALL SIEVNT                                                             
+        CALL SILTOC(IERR)                                                       
+        IF ( IERR .NE. 0 ) THEN                                                 
+          WRITE(6,*)'IERR FROM SILTOC = ',IERR                                  
+          IF ( ACTIVE(ESICUT) .OR. ACTIVE(MSICUT) ) THEN                        
+            RETURN                                                              
+          ENDIF                                                                 
+        ELSE                                                                    
+          CALL SIV2ND                                                           
+        ENDIF                                                                   
+        CALL ZDETEC                                                             
+C---------------------------------------------------------------------          
+CCCC  IF(MUEVEN.GE.NREP) ISTAT = -1                                             
+C---------------------------------------------------------------------          
+C                                                                               
+C                    M U O N      C H A M B E R S                               
+C                                                                               
+C---------------------------------------------------------------------          
+      IF(LBLENG(50017) .LE. 0 ) THEN                                            
+        CALL MURAW(MUCUT)                                                       
+        CALL NEWLAB                                                             
+      ENDIF                                                                     
+      IF(DSTFLG.AND.MUFLAG)      CALL MUDST(MUCUT)                              
+CCCCCCIF(DSTFLG.AND.MUFLAG)      CALL MUFIX                                     
+      NCUT(1,1) = NCUT(1,1) + 1                                                 
+C---------------------------------------------------------------------          
+C                                                                               
+C                    D R I F T    C H A M B E R S                               
+C                                                                               
+C---------------------------------------------------------------------          
+      CALL DC(DCCUT)                                                            
+CCCC  IF(XCUT(2).AND.DCCUT) RETURN                                              
+C     NCUT(2,1) = NCUT(2,1) + 1                                                 
+C---------------------------------------------------------------------          
+C                                                                               
+C                             E T O T                                           
+C                                                                               
+C---------------------------------------------------------------------          
+CC    CALL                  ENERGY(ETOTC,EEE)                                   
+C     IF(XCUT(4).AND.ETOTC) RETURN                                              
+C     NCUT(4,1) = NCUT(4,1) + 1                                                 
+C---------------------------------------------------------------------          
+C                                                                               
+C                            S I P A D                                          
+C                                                                               
+C---------------------------------------------------------------------          
+      CALL SPEVNT(MUEVEN)                                                       
+CCCC  CALL                SIPAD(SIC)                                            
+C     IF(XCUT(5).AND.SIC) RETURN                                                
+C     NCUT(5,1) = NCUT(5,1) + 1                                                 
+C--------------------------------------------------------------------           
+C                                                                               
+C                 S C I N T I L L A T O R     P A D S                           
+C                                                                               
+C-----------------
